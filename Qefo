@@ -1,0 +1,801 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+import networkx as nx
+import time
+import math
+from typing import Dict, List, Tuple, Optional
+from collections import defaultdict
+import matplotlib.pyplot as plt
+
+class EnhancedQuantumEntangledFractalOptimizer(torch.optim.Optimizer):
+    """
+    Enhanced Quantum Entangled Fractal Optimizer (Enhanced QEFO)
+    
+    Now includes all QFRL features:
+    - Dynamic base transformations
+    - Adaptive modulus operations
+    - Fractal scaling with learnable dimensions
+    - Quantum phase modulation
+    - Parameter entanglement
+    - Fractal Brownian motion
+    - Quantum fluctuations
+    - Resonance patterns
+    """
+    
+    def __init__(self, params, lr=0.01, betas=(0.9, 0.999), eps=1e-8,
+                 weight_decay=0, hurst=0.75, entanglement_strength=0.1,
+                 adaptive_base_range=(0.1, 5.0), adaptive_modulus_range=(1.0, 10.0),
+                 fractal_dimension_range=(1.1, 2.0), resonance_strength=0.1,
+                 quantum_fluctuation_strength=0.01):
+        
+        defaults = dict(
+            lr=lr, betas=betas, eps=eps, weight_decay=weight_decay,
+            hurst=hurst, entanglement_strength=entanglement_strength,
+            adaptive_base_range=adaptive_base_range,
+            adaptive_modulus_range=adaptive_modulus_range,
+            fractal_dimension_range=fractal_dimension_range,
+            resonance_strength=resonance_strength,
+            quantum_fluctuation_strength=quantum_fluctuation_strength
+        )
+        
+        super(EnhancedQuantumEntangledFractalOptimizer, self).__init__(params, defaults)
+        
+        # Build entanglement graph
+        self.entanglement_graph = nx.Graph()
+        all_params = []
+        for group in self.param_groups:
+            for p in group['params']:
+                if p.requires_grad:
+                    param_id = id(p)
+                    self.entanglement_graph.add_node(param_id)
+                    all_params.append(param_id)
+        
+        # Create sparse entanglement connections
+        if len(all_params) > 1:
+            num_connections = min(len(all_params) * 2, len(all_params) * (len(all_params) - 1) // 4)
+            for _ in range(num_connections):
+                if len(all_params) >= 2:
+                    node1, node2 = np.random.choice(all_params, 2, replace=False)
+                    self.entanglement_graph.add_edge(node1, node2)
+        
+        # Initialize global adaptive parameters
+        self.global_adaptive_base = torch.tensor(
+            (adaptive_base_range[0] + adaptive_base_range[1]) / 2
+        )
+        self.global_adaptive_modulus = torch.tensor(
+            (adaptive_modulus_range[0] + adaptive_modulus_range[1]) / 2
+        )
+        self.global_fractal_dimension = torch.tensor(
+            (fractal_dimension_range[0] + fractal_dimension_range[1]) / 2
+        )
+        
+        # Resonance parameters
+        self.resonance_phase = 0.0
+        self.step_count = 0
+    
+    def adaptive_base_transform(self, x: torch.Tensor, base_factor: float, inverse: bool = False) -> torch.Tensor:
+        """Apply adaptive base transformation"""
+        base_factor = max(0.1, min(base_factor, 10.0))  # Clamp
+        
+        if not inverse:
+            # Forward: compressive transformation
+            return torch.sign(x) * torch.log1p(torch.abs(x) * base_factor)
+        else:
+            # Inverse: expansive transformation
+            return torch.sign(x) * (torch.exp(torch.abs(x)) - 1) / base_factor
+    
+    def adaptive_modulus_operation(self, x: torch.Tensor, mod_factor: float) -> torch.Tensor:
+        """Apply adaptive modulus operation"""
+        mod_factor = max(1.0, min(mod_factor, 20.0))  # Clamp
+        return x - mod_factor * torch.round(x / mod_factor)
+    
+    def fractal_scaling(self, x: torch.Tensor, fractal_dim: float) -> torch.Tensor:
+        """Apply fractal scaling with learnable dimension"""
+        fractal_dim = max(1.0, min(fractal_dim, 2.5))  # Clamp
+        return torch.sign(x) * torch.abs(x).pow(fractal_dim)
+    
+    def quantum_fluctuations(self, x: torch.Tensor, strength: float) -> torch.Tensor:
+        """Add quantum fluctuations"""
+        if strength > 0:
+            return x + strength * torch.randn_like(x)
+        return x
+    
+    def fractal_brownian_motion(self, shape, hurst, device):
+        """Generate fractal Brownian motion"""
+        try:
+            noise = torch.randn(shape, device=device)
+            if len(shape) > 1:
+                t = torch.arange(shape[-1], device=device).float()
+                t = t.view([1] * (len(shape) - 1) + [-1]).expand(shape)
+            else:
+                t = torch.arange(shape[0], device=device).float()
+            
+            # Apply Hurst scaling
+            scaling = (t + 1).pow(hurst)
+            return noise * scaling * 0.01  # Scale down for stability
+        except Exception as e:
+            return torch.zeros(shape, device=device) * 0.01
+    
+    def resonance_modulation(self, x: torch.Tensor, strength: float) -> torch.Tensor:
+        """Apply resonance patterns"""
+        if strength > 0:
+            resonance = torch.sin(x + self.resonance_phase) * strength
+            return x * (1 + resonance)
+        return x
+    
+    def compute_entanglement_effect(self, param: torch.Tensor, strength: float) -> Optional[torch.Tensor]:
+        """Compute entanglement effects from connected parameters"""
+        try:
+            param_id = id(param)
+            if param_id not in self.entanglement_graph:
+                return None
+            
+            neighbors = list(self.entanglement_graph[param_id])
+            if not neighbors:
+                return None
+            
+            entangled_gradients = []
+            for neighbor_id in neighbors:
+                # Find parameter with this id
+                for group in self.param_groups:
+                    for p in group['params']:
+                        if id(p) == neighbor_id and p in self.state:
+                            if 'exp_avg' in self.state[p]:
+                                neighbor_grad = self.state[p]['exp_avg']
+                                if neighbor_grad.shape == param.shape:
+                                    entangled_gradients.append(neighbor_grad)
+                                elif neighbor_grad.numel() == param.numel():
+                                    entangled_gradients.append(neighbor_grad.view(param.shape))
+                            break
+            
+            if not entangled_gradients:
+                return None
+            
+            # Compute weighted entanglement effect
+            entanglement_effect = torch.mean(torch.stack(entangled_gradients), dim=0)
+            return strength * entanglement_effect
+            
+        except Exception as e:
+            return None
+    
+    @torch.no_grad()
+    def step(self, closure=None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+        
+        self.step_count += 1
+        
+        # Update global adaptive parameters
+        adaptation_rate = 0.01
+        self.global_adaptive_base += adaptation_rate * (torch.randn(1).item() * 0.1)
+        self.global_adaptive_modulus += adaptation_rate * (torch.randn(1).item() * 0.1)
+        self.global_fractal_dimension += adaptation_rate * (torch.randn(1).item() * 0.05)
+        
+        # Update resonance phase
+        self.resonance_phase += 0.1
+        
+        for group in self.param_groups:
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+                
+                grad = p.grad
+                if grad.is_sparse:
+                    raise RuntimeError('Enhanced QEFO does not support sparse gradients')
+                
+                state = self.state[p]
+                
+                # State initialization
+                if len(state) == 0:
+                    state['step'] = 0
+                    state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                    state['exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                    state['quantum_phase'] = torch.rand_like(p) * 2 * np.pi
+                    state['adaptive_base_factor'] = torch.tensor(self.global_adaptive_base.item())
+                    state['adaptive_modulus_factor'] = torch.tensor(self.global_adaptive_modulus.item())
+                    state['fractal_dimension'] = torch.tensor(self.global_fractal_dimension.item())
+                
+                exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
+                beta1, beta2 = group['betas']
+                
+                state['step'] += 1
+                
+                # Weight decay
+                if group['weight_decay'] != 0:
+                    grad = grad.add(p, alpha=group['weight_decay'])
+                
+                # 1. Apply dynamic base transformation to gradients (compressive)
+                grad_transformed = self.adaptive_base_transform(
+                    grad, state['adaptive_base_factor'].item(), inverse=False
+                )
+                
+                # 2. Apply adaptive modulus to transformed gradients
+                grad_modulated = self.adaptive_modulus_operation(
+                    grad_transformed, state['adaptive_modulus_factor'].item()
+                )
+                
+                # 3. Add fractal Brownian motion
+                if group['hurst'] > 0:
+                    fractal_noise = self.fractal_brownian_motion(
+                        grad.shape, group['hurst'], grad.device
+                    )
+                    grad_modulated = grad_modulated + fractal_noise
+                
+                # 4. Exponential moving averages (on modulated gradients)
+                exp_avg.mul_(beta1).add_(grad_modulated, alpha=1 - beta1)
+                exp_avg_sq.mul_(beta2).addcmul_(grad_modulated, grad_modulated, value=1 - beta2)
+                
+                # 5. Apply adaptive modulus to moment estimates
+                exp_avg_mod = self.adaptive_modulus_operation(
+                    exp_avg, state['adaptive_modulus_factor'].item()
+                )
+                exp_avg_sq_mod = self.adaptive_modulus_operation(
+                    exp_avg_sq, state['adaptive_modulus_factor'].item()
+                )
+                
+                denom = exp_avg_sq_mod.sqrt().add_(group['eps'])
+                
+                # 6. Bias correction
+                step_size = group['lr']
+                if state['step'] > 1:
+                    step_size *= math.sqrt(1 - beta2 ** state['step']) / (1 - beta1 ** state['step'])
+                
+                # 7. Quantum phase modulation
+                quantum_amp = torch.cos(state['quantum_phase'])
+                
+                # 8. Compute base update
+                update = exp_avg_mod / denom * (-step_size * quantum_amp)
+                
+                # 9. Apply fractal scaling to update
+                update_scaled = self.fractal_scaling(update, state['fractal_dimension'].item())
+                
+                # 10. Add resonance modulation
+                update_resonant = self.resonance_modulation(update_scaled, group['resonance_strength'])
+                
+                # 11. Add quantum fluctuations
+                update_quantum = self.quantum_fluctuations(
+                    update_resonant, group['quantum_fluctuation_strength']
+                )
+                
+                # 12. Add entanglement effects
+                entanglement_effect = self.compute_entanglement_effect(p, group['entanglement_strength'])
+                if entanglement_effect is not None:
+                    # Apply same transformations to entanglement effect
+                    entanglement_transformed = self.adaptive_base_transform(
+                        entanglement_effect, state['adaptive_base_factor'].item(), inverse=False
+                    )
+                    entanglement_scaled = self.fractal_scaling(
+                        entanglement_transformed, state['fractal_dimension'].item()
+                    )
+                    update_quantum = update_quantum + entanglement_scaled * step_size * 0.1
+                
+                # 13. Apply inverse base transformation to final update (expansive)
+                final_update = self.adaptive_base_transform(
+                    update_quantum, state['adaptive_base_factor'].item(), inverse=True
+                )
+                
+                # 14. Apply parameter update
+                p.add_(final_update)
+                
+                # 15. Update quantum phase and adaptive parameters
+                state['quantum_phase'] += grad * group['lr']
+                state['quantum_phase'].fmod_(2 * np.pi)
+                
+                # Adapt the adaptive parameters based on gradient information
+                state['adaptive_base_factor'] = torch.clamp(
+                    state['adaptive_base_factor'] + 0.001 * torch.mean(torch.abs(grad)).item() * torch.randn(1).item(),
+                    group['adaptive_base_range'][0], group['adaptive_base_range'][1]
+                )
+                state['adaptive_modulus_factor'] = torch.clamp(
+                    state['adaptive_modulus_factor'] + 0.001 * torch.std(grad).item() * torch.randn(1).item(),
+                    group['adaptive_modulus_range'][0], group['adaptive_modulus_range'][1]
+                )
+                state['fractal_dimension'] = torch.clamp(
+                    state['fractal_dimension'] + 0.0001 * torch.norm(grad).item() * torch.randn(1).item(),
+                    group['fractal_dimension_range'][0], group['fractal_dimension_range'][1]
+                )
+        
+        return loss
+
+
+class ComprehensiveOptimizerBenchmark:
+    """Enhanced benchmark suite for comparing optimizers"""
+    
+    def __init__(self, device='cpu'):
+        self.device = torch.device(device)
+        self.results = {}
+    
+    def create_complex_model(self, input_size=128, hidden_sizes=[64, 32], output_size=10):
+        """Create a more complex test model"""
+        layers = []
+        prev_size = input_size
+        
+        for hidden_size in hidden_sizes:
+            layers.extend([
+                nn.Linear(prev_size, hidden_size),
+                nn.BatchNorm1d(hidden_size),
+                nn.ReLU(),
+                nn.Dropout(0.1)
+            ])
+            prev_size = hidden_size
+        
+        layers.append(nn.Linear(prev_size, output_size))
+        
+        return nn.Sequential(*layers).to(self.device)
+    
+    def create_challenging_data(self, num_samples=2000, input_size=128, output_size=10, noise_level=0.1):
+        """Create challenging synthetic data with noise and non-linear patterns"""
+        X = torch.randn(num_samples, input_size, device=self.device)
+        
+        # Create complex non-linear relationships
+        feature_combinations = X[:, :output_size] ** 2 + X[:, output_size:2*output_size] ** 3
+        noise = noise_level * torch.randn(num_samples, output_size, device=self.device)
+        targets = feature_combinations + noise
+        
+        # Convert to classification
+        y = torch.argmax(targets, dim=1) % output_size
+        
+        return X, y
+    
+    def benchmark_convergence_enhanced(self, num_epochs=100, num_runs=3):
+        """Enhanced convergence benchmark with complex scenarios"""
+        print("Running Enhanced Convergence Benchmark...")
+        print("=" * 60)
+        
+        optimizers_config = {
+            'Adam': lambda params: optim.Adam(params, lr=0.001),
+            'SGD': lambda params: optim.SGD(params, lr=0.01, momentum=0.9),
+            'AdamW': lambda params: optim.AdamW(params, lr=0.001, weight_decay=0.01),
+            'Enhanced_QEFO': lambda params: EnhancedQuantumEntangledFractalOptimizer(
+                params, lr=0.001, 
+                entanglement_strength=0.1, 
+                hurst=0.75,
+                adaptive_base_range=(0.1, 3.0),
+                adaptive_modulus_range=(1.0, 8.0),
+                fractal_dimension_range=(1.1, 1.8),
+                resonance_strength=0.05,
+                quantum_fluctuation_strength=0.005
+            )
+        }
+        
+        results = {}
+        
+        for optimizer_name, optimizer_fn in optimizers_config.items():
+            print(f"\nTesting {optimizer_name}...")
+            
+            run_results = []
+            
+            for run in range(num_runs):
+                print(f"  Run {run+1}/{num_runs}")
+                
+                # Create fresh model and complex data
+                model = self.create_complex_model()
+                X, y = self.create_challenging_data()
+                optimizer = optimizer_fn(model.parameters())
+                criterion = nn.CrossEntropyLoss()
+                
+                losses = []
+                accuracies = []
+                start_time = time.time()
+                
+                for epoch in range(num_epochs):
+                    model.train()
+                    optimizer.zero_grad()
+                    
+                    outputs = model(X)
+                    loss = criterion(outputs, y)
+                    loss.backward()
+                    optimizer.step()
+                    
+                    # Calculate accuracy
+                    with torch.no_grad():
+                        _, predicted = torch.max(outputs.data, 1)
+                        accuracy = (predicted == y).float().mean().item()
+                    
+                    losses.append(loss.item())
+                    accuracies.append(accuracy)
+                    
+                    if epoch % 20 == 0:
+                        print(f"    Epoch {epoch}: Loss = {loss.item():.6f}, Acc = {accuracy:.4f}")
+                
+                training_time = time.time() - start_time
+                
+                run_results.append({
+                    'losses': losses,
+                    'accuracies': accuracies,
+                    'final_loss': losses[-1],
+                    'final_accuracy': accuracies[-1],
+                    'training_time': training_time,
+                    'convergence_epoch': self.find_convergence_epoch(losses, accuracies)
+                })
+            
+            # Aggregate results
+            results[optimizer_name] = {
+                'runs': run_results,
+                'avg_final_loss': np.mean([r['final_loss'] for r in run_results]),
+                'std_final_loss': np.std([r['final_loss'] for r in run_results]),
+                'avg_final_accuracy': np.mean([r['final_accuracy'] for r in run_results]),
+                'std_final_accuracy': np.std([r['final_accuracy'] for r in run_results]),
+                'avg_training_time': np.mean([r['training_time'] for r in run_results]),
+                'avg_convergence_epoch': np.mean([r['convergence_epoch'] for r in run_results])
+            }
+            
+            print(f"    Avg Final Loss: {results[optimizer_name]['avg_final_loss']:.6f}")
+            print(f"    Avg Final Accuracy: {results[optimizer_name]['avg_final_accuracy']:.4f}")
+            print(f"    Avg Training Time: {results[optimizer_name]['avg_training_time']:.2f}s")
+        
+        self.results['enhanced_convergence'] = results
+        return results
+    
+    def find_convergence_epoch(self, losses, accuracies):
+        """Find epoch where meaningful convergence occurs"""
+        # Look for where accuracy plateaus or loss reduction slows significantly
+        if len(accuracies) < 10:
+            return len(accuracies)
+        
+        # Find epoch where accuracy improvement becomes < 1% over 10 epochs
+        for i in range(10, len(accuracies)):
+            recent_improvement = accuracies[i] - accuracies[i-10]
+            if recent_improvement < 0.01:  # Less than 1% improvement
+                return i
+        
+        return len(accuracies)
+    
+    def benchmark_step_time_detailed(self):
+        """Detailed step time benchmark"""
+        print("\nRunning Detailed Step Time Benchmark...")
+        print("=" * 50)
+        
+        model_configs = [
+            (64, [32], 10),      # Small model
+            (128, [64, 32], 10), # Medium model  
+            (256, [128, 64], 20), # Large model
+        ]
+        
+        results = {}
+        
+        for input_size, hidden_sizes, output_size in model_configs:
+            config_name = f"{input_size}→{hidden_sizes}→{output_size}"
+            print(f"\nTesting model: {config_name}")
+            
+            config_results = {}
+            
+            for optimizer_name in ['Adam', 'SGD', 'Enhanced_QEFO']:
+                model = self.create_complex_model(input_size, hidden_sizes, output_size)
+                X = torch.randn(64, input_size, device=self.device)
+                y = torch.randint(0, output_size, (64,), device=self.device)
+                criterion = nn.CrossEntropyLoss()
+                
+                if optimizer_name == 'Adam':
+                    optimizer = optim.Adam(model.parameters(), lr=0.001)
+                elif optimizer_name == 'SGD':
+                    optimizer = optim.SGD(model.parameters(), lr=0.01)
+                else:  # Enhanced_QEFO
+                    optimizer = EnhancedQuantumEntangledFractalOptimizer(model.parameters(), lr=0.001)
+                
+                # Warmup
+                for _ in range(5):
+                    optimizer.zero_grad()
+                    outputs = model(X)
+                    loss = criterion(outputs, y)
+                    loss.backward()
+                    optimizer.step()
+                
+                # Benchmark step time
+                step_times = []
+                for _ in range(30):
+                    optimizer.zero_grad()
+                    outputs = model(X)
+                    loss = criterion(outputs, y)
+                    loss.backward()
+                    
+                    start_time = time.time()
+                    optimizer.step()
+                    step_time = time.time() - start_time
+                    step_times.append(step_time * 1000)  # Convert to ms
+                
+                config_results[optimizer_name] = {
+                    'avg_time_ms': np.mean(step_times),
+                    'std_time_ms': np.std(step_times),
+                    'min_time_ms': np.min(step_times),
+                    'max_time_ms': np.max(step_times)
+                }
+                
+                print(f"  {optimizer_name}: {np.mean(step_times):.3f} ± {np.std(step_times):.3f} ms")
+            
+            results[config_name] = config_results
+        
+        self.results['detailed_step_time'] = results
+        return results
+    
+    def benchmark_optimization_robustness(self):
+        """Test optimizer robustness on challenging scenarios"""
+        print("\nRunning Optimization Robustness Benchmark...")
+        print("=" * 50)
+        
+        scenarios = {
+            'high_noise': {'noise_level': 0.3, 'lr_multiplier': 1.0},
+            'low_learning_rate': {'noise_level': 0.1, 'lr_multiplier': 0.1},
+            'high_learning_rate': {'noise_level': 0.1, 'lr_multiplier': 5.0},
+            'very_noisy': {'noise_level': 0.5, 'lr_multiplier': 1.0}
+        }
+        
+        results = {}
+        
+        for scenario_name, scenario_config in scenarios.items():
+            print(f"\nTesting scenario: {scenario_name}")
+            scenario_results = {}
+            
+            for optimizer_name in ['Adam', 'Enhanced_QEFO']:
+                model = self.create_complex_model()
+                X, y = self.create_challenging_data(noise_level=scenario_config['noise_level'])
+                criterion = nn.CrossEntropyLoss()
+                
+                base_lr = 0.001 * scenario_config['lr_multiplier']
+                
+                if optimizer_name == 'Adam':
+                    optimizer = optim.Adam(model.parameters(), lr=base_lr)
+                else:  # Enhanced_QEFO
+                    optimizer = EnhancedQuantumEntangledFractalOptimizer(
+                        model.parameters(), lr=base_lr,
+                        quantum_fluctuation_strength=0.01,  # Higher for noisy scenarios
+                        entanglement_strength=0.15
+                    )
+                
+                losses = []
+                for epoch in range(50):
+                    optimizer.zero_grad()
+                    outputs = model(X)
+                    loss = criterion(outputs, y)
+                    loss.backward()
+                    optimizer.step()
+                    losses.append(loss.item())
+                
+                # Calculate stability metrics
+                final_losses = losses[-10:]  # Last 10 epochs
+                stability = 1.0 / (1.0 + np.std(final_losses))  # Higher = more stable
+                
+                scenario_results[optimizer_name] = {
+                    'final_loss': losses[-1],
+                    'stability': stability,
+                    'loss_reduction': (losses[0] - losses[-1]) / losses[0],
+                    'losses': losses
+                }
+                
+                print(f"  {optimizer_name}: Final loss = {losses[-1]:.6f}, Stability = {stability:.4f}")
+            
+            results[scenario_name] = scenario_results
+        
+        self.results['robustness'] = results
+        return results
+    
+    def generate_comprehensive_report(self):
+        """Generate detailed comparison report"""
+        print("\n" + "=" * 80)
+        print("ENHANCED QUANTUM ENTANGLED FRACTAL OPTIMIZER - COMPREHENSIVE REPORT")
+        print("=" * 80)
+        
+        # Enhanced Convergence Results
+        if 'enhanced_convergence' in self.results:
+            print("\n📈 ENHANCED CONVERGENCE PERFORMANCE:")
+            print("-" * 50)
+            conv_results = self.results['enhanced_convergence']
+            
+            print(f"{'Optimizer':<15} {'Final Loss':<12} {'Final Acc':<12} {'Conv Speed':<12} {'Time':<8}")
+            print("-" * 65)
+            
+            for opt_name, metrics in conv_results.items():
+                print(f"{opt_name:<15} {metrics['avg_final_loss']:<12.6f} "
+                      f"{metrics['avg_final_accuracy']:<12.4f} "
+                      f"{metrics['avg_convergence_epoch']:<12.1f} "
+                      f"{metrics['avg_training_time']:<8.2f}s")
+        
+        # Step Time Results
+        if 'detailed_step_time' in self.results:
+            print("\n⚡ DETAILED STEP TIME ANALYSIS:")
+            print("-" * 50)
+            step_results = self.results['detailed_step_time']
+            
+            for config_name, config_results in step_results.items():
+                print(f"\nModel: {config_name}")
+                for opt_name, metrics in config_results.items():
+                    slowdown = metrics['avg_time_ms'] / config_results['SGD']['avg_time_ms'] if 'SGD' in config_results else 1.0
+                    print(f"  {opt_name:<15}: {metrics['avg_time_ms']:.3f}ms ({slowdown:.2f}x vs SGD)")
+        
+        # Robustness Results
+        if 'robustness' in self.results:
+            print("\n🛡️ ROBUSTNESS ANALYSIS:")
+            print("-" * 50)
+            rob_results = self.results['robustness']
+            
+            for scenario, scenario_results in rob_results.items():
+                print(f"\n{scenario.replace('_', ' ').title()}:")
+                for opt_name, metrics in scenario_results.items():
+                    print(f"  {opt_name:<15}: Loss={metrics['final_loss']:.6f}, "
+                          f"Stability={metrics['stability']:.4f}, "
+                          f"Reduction={metrics['loss_reduction']:.2%}")
+        
+        # Summary Analysis
+        print("\n🎯 ENHANCED QEFO PERFORMANCE SUMMARY:")
+        print("-" * 50)
+        
+        if 'enhanced_convergence' in self.results:
+            conv_results = self.results['enhanced_convergence']
+            adam_loss = conv_results['Adam']['avg_final_loss']
+            qefo_loss = conv_results['Enhanced_QEFO']['avg_final_loss']
+            adam_acc = conv_results['Adam']['avg_final_accuracy']
+            qefo_acc = conv_results['Enhanced_QEFO']['avg_final_accuracy']
+            
+            loss_improvement = ((adam_loss - qefo_loss) / adam_loss) * 100
+            acc_improvement = ((qefo_acc - adam_acc) / adam_acc) * 100
+            
+            print(f"Loss improvement over Adam: {loss_improvement:+.1f}%")
+            print(f"Accuracy improvement over Adam: {acc_improvement:+.1f}%")
+            
+            if 'detailed_step_time' in self.results:
+                # Get average slowdown across all model sizes
+                step_results = self.results['detailed_step_time']
+                slowdowns = []
+                for config_results in step_results.values():
+                    if 'Enhanced_QEFO' in config_results and 'SGD' in config_results:
+                        slowdown = config_results['Enhanced_QEFO']['avg_time_ms'] / config_results['SGD']['avg_time_ms']
+                        slowdowns.append(slowdown)
+                
+                avg_slowdown = np.mean(slowdowns) if slowdowns else 1.0
+                print(f"Average computational overhead: {avg_slowdown:.1f}x vs SGD")
+                
+                # Calculate efficiency ratio
+                efficiency_ratio = loss_improvement / ((avg_slowdown - 1) * 100) if avg_slowdown > 1 else float('inf')
+                print(f"Efficiency ratio (improvement/overhead): {efficiency_ratio:.2f}")
+                
+                if efficiency_ratio > 0.5:
+                    print("✅ Enhanced QEFO shows net positive benefit")
+                elif efficiency_ratio > 0.2:
+                    print("⚠️ Enhanced QEFO shows moderate benefit")
+                else:
+                    print("❌ Enhanced QEFO overhead may outweigh benefits")
+        
+        return self.results
+    
+    def plot_enhanced_comparison(self):
+        """Create comprehensive visualization of results"""
+        if 'enhanced_convergence' not in self.results:
+            return
+        
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+        
+        conv_results = self.results['enhanced_convergence']
+        
+        # 1. Convergence curves
+        for opt_name, metrics in conv_results.items():
+            if metrics['runs']:
+                # Average loss curves across runs
+                all_losses = [run['losses'] for run in metrics['runs']]
+                min_length = min(len(losses) for losses in all_losses)
+                truncated_losses = [losses[:min_length] for losses in all_losses]
+                avg_losses = np.mean(truncated_losses, axis=0)
+                std_losses = np.std(truncated_losses, axis=0)
+                
+                epochs = range(len(avg_losses))
+                ax1.plot(epochs, avg_losses, label=opt_name, linewidth=2)
+                ax1.fill_between(epochs, 
+                               avg_losses - std_losses, 
+                               avg_losses + std_losses, 
+                               alpha=0.2)
+        
+        ax1.set_xlabel('Epoch')
+        ax1.set_ylabel('Loss')
+        ax1.set_title('Enhanced Convergence Comparison')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        ax1.set_yscale('log')
+        
+        # 2. Final performance comparison
+        optimizers = list(conv_results.keys())
+        final_losses = [conv_results[opt]['avg_final_loss'] for opt in optimizers]
+        final_accs = [conv_results[opt]['avg_final_accuracy'] for opt in optimizers]
+        
+        x = np.arange(len(optimizers))
+        width = 0.35
+        
+        ax2_twin = ax2.twinx()
+        bars1 = ax2.bar(x - width/2, final_losses, width, label='Final Loss', alpha=0.8, color='red')
+        bars2 = ax2_twin.bar(x + width/2, final_accs, width, label='Final Accuracy', alpha=0.8, color='blue')
+        
+        ax2.set_xlabel('Optimizer')
+        ax2.set_ylabel('Final Loss', color='red')
+        ax2_twin.set_ylabel('Final Accuracy', color='blue')
+        ax2.set_title('Final Performance Comparison')
+        ax2.set_xticks(x)
+        ax2.set_xticklabels(optimizers, rotation=45)
+        ax2.grid(True, alpha=0.3)
+        
+        # 3. Step time comparison
+        if 'detailed_step_time' in self.results:
+            step_results = self.results['detailed_step_time']
+            configs = list(step_results.keys())
+            optimizers = ['Adam', 'SGD', 'Enhanced_QEFO']
+            
+            x = np.arange(len(configs))
+            width = 0.25
+            
+            for i, opt in enumerate(optimizers):
+                times = [step_results[config].get(opt, {}).get('avg_time_ms', 0) for config in configs]
+                ax3.bar(x + i*width, times, width, label=opt, alpha=0.8)
+            
+            ax3.set_xlabel('Model Configuration')
+            ax3.set_ylabel('Step Time (ms)')
+            ax3.set_title('Step Time by Model Size')
+            ax3.set_xticks(x + width)
+            ax3.set_xticklabels(configs, rotation=45)
+            ax3.legend()
+            ax3.grid(True, alpha=0.3)
+        
+        # 4. Robustness comparison
+        if 'robustness' in self.results:
+            rob_results = self.results['robustness']
+            scenarios = list(rob_results.keys())
+            adam_stability = [rob_results[scenario]['Adam']['stability'] for scenario in scenarios]
+            qefo_stability = [rob_results[scenario]['Enhanced_QEFO']['stability'] for scenario in scenarios]
+            
+            x = np.arange(len(scenarios))
+            width = 0.35
+            
+            ax4.bar(x - width/2, adam_stability, width, label='Adam', alpha=0.8)
+            ax4.bar(x + width/2, qefo_stability, width, label='Enhanced QEFO', alpha=0.8)
+            
+            ax4.set_xlabel('Scenario')
+            ax4.set_ylabel('Stability Score')
+            ax4.set_title('Robustness Across Scenarios')
+            ax4.set_xticks(x)
+            ax4.set_xticklabels([s.replace('_', ' ').title() for s in scenarios], rotation=45)
+            ax4.legend()
+            ax4.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
+
+
+def run_enhanced_benchmark():
+    """Run the comprehensive enhanced benchmark"""
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Running Enhanced QEFO Benchmark on: {device}")
+    print("This benchmark includes all QFRL features in the optimizer:")
+    print("- Dynamic base transformations")
+    print("- Adaptive modulus operations") 
+    print("- Fractal scaling with learnable dimensions")
+    print("- Quantum phase modulation")
+    print("- Parameter entanglement")
+    print("- Fractal Brownian motion")
+    print("- Resonance patterns")
+    print("- Quantum fluctuations")
+    
+    benchmark = ComprehensiveOptimizerBenchmark(device)
+    
+    # Run all enhanced benchmarks
+    print("\n🚀 Starting comprehensive benchmark suite...")
+    
+    # 1. Enhanced convergence test
+    benchmark.benchmark_convergence_enhanced(num_epochs=80, num_runs=2)
+    
+    # 2. Detailed step time analysis
+    benchmark.benchmark_step_time_detailed()
+    
+    # 3. Robustness testing
+    benchmark.benchmark_optimization_robustness()
+    
+    # 4. Generate comprehensive report
+    results = benchmark.generate_comprehensive_report()
+    
+    # 5. Create visualizations
+    benchmark.plot_enhanced_comparison()
+    
+    return results
+
+
+if __name__ == "__main__":
+    results = run_enhanced_benchmark()

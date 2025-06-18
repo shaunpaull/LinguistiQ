@@ -1,1 +1,1187 @@
+import numpy as np
+import random
+from typing import List, Tuple, Dict, Callable, Optional
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.cuda.amp import autocast, GradScaler
+import requests
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+import torch.nn.functional as F
+from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModel
+from rouge_score import rouge_scorer
+from collections import Counter
+from torch.utils.data import DataLoader
+from datasets import Dataset
+from transformers import DataCollatorWithPadding
+import time
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
+from scipy.stats import levy
+import networkx as nx
+from enum import Enum
+from torch.cuda.amp import GradScaler
+from typing import List, Dict, Any
+import math
 
+https://colab.research.google.com/drive/1hH9_9zquM4yMGu8BYAGYtfQ8ZVm1ewOe#scrollTo=sEUzJ-raWMhP&line=29&uniqifier=1
+
+def simple_bleu_score(self, reference, candidate, max_n=4):
+    def ngrams(tokens, n):
+        return Counter(zip(*[tokens[i:] for i in range(n)]))
+
+    if len(candidate) == 0:
+        return 0
+
+    ref_len = len(reference)
+    cand_len = len(candidate)
+
+    clip_len = min(ref_len, cand_len)
+
+    totals = [0] * max_n
+    for n in range(1, max_n + 1):
+        ref_ngrams = ngrams(reference, n)
+        cand_ngrams = ngrams(candidate, n)
+        totals[n-1] = sum(min(ref_ngrams[ng], cand_ngrams[ng]) for ng in cand_ngrams)
+
+    weights = [1/max_n] * max_n
+    score = np.exp(sum(w * np.log((total + 1e-8)/(clip_len-n+1 + 1e-8)) for n, (total, w) in enumerate(zip(totals, weights), 1)))
+
+    bp = 1 if cand_len > ref_len else np.exp(1 - ref_len/(cand_len + 1e-8))
+    return bp * score
+
+class FractionalDimension:
+    def init(self, whole: float = 0.1, fractional: float = 0.0):
+        self.whole = whole
+        self.fractional = fractional
+
+    def get_whole(self) -> float:
+        return self.whole
+
+    def set_whole(self, value: float):
+        self.whole = value
+
+    def get_fractional(self) -> float:
+        assert 0.0 <= self.fractional <= 1.0
+        return self.fractional
+
+    def set_fractional(self, value: float):
+        assert 0.0 <= value <= 1.0
+        self.fractional = value
+
+class NestedDimension:
+    def __init__(self, value: float):
+        self.value = value
+        self.children: List[NestedDimension] = []
+
+    def add_nested_dimension(self, value: float) -> 'NestedDimension':
+        child = NestedDimension(value)
+        self.children.append(child)
+        return child
+
+    def get_value(self) -> float:
+        return self.value
+
+    def get_children(self) -> List['NestedDimension']:
+        return self.children
+
+import torch
+import numpy as np
+import networkx as nx
+from typing import Tuple
+
+
+class QuantumEntangledFractalOptimizer(torch.optim.Optimizer):
+    def __init__(self, params, lr=0.01, betas=(0.9, 0.999), eps=1e-8,
+                 weight_decay=0, hurst=0.75, entanglement_strength=0.1):
+        defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay,
+                        hurst=hurst, entanglement_strength=entanglement_strength)
+        super(QuantumEntangledFractalOptimizer, self).__init__(params, defaults)
+
+        self.entanglement_graph = nx.Graph()
+        for group in self.param_groups:
+            for p in group['params']:
+                self.entanglement_graph.add_node(id(p))
+
+        num_params = len(list(self.entanglement_graph.nodes()))
+        num_connections = int(num_params * (num_params - 1) / 4)
+        for _ in range(num_connections):
+            node1, node2 = np.random.choice(list(self.entanglement_graph.nodes()), 2, replace=False)
+            self.entanglement_graph.add_edge(node1, node2)
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
+        for group in self.param_groups:
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+                grad = p.grad
+                if grad.is_sparse:
+                    raise RuntimeError('QEFO does not support sparse gradients')
+
+                state = self.state[p]
+
+                if len(state) == 0:
+                    state['step'] = 0
+                    state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                    state['exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                    state['quantum_phase'] = torch.rand_like(p) * 2 * np.pi
+
+                exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
+                beta1, beta2 = group['betas']
+
+                state['step'] += 1
+
+                if group['weight_decay'] != 0:
+                    grad = grad.add(p, alpha=group['weight_decay'])
+
+                # Decay the first and second moment running average coefficient
+                exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
+                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+                denom = exp_avg_sq.sqrt().add_(group['eps'])
+
+                step_size = group['lr']
+                if state['step'] > 1:
+                    step_size *= math.sqrt(1 - beta2 ** state['step']) / (1 - beta1 ** state['step'])
+
+                quantum_amp = torch.cos(state['quantum_phase'])
+
+                # Use element-wise multiplication instead of addcdiv_
+                p.add_(exp_avg / denom * (-step_size * quantum_amp))
+
+                state['quantum_phase'] += grad * group['lr']
+                state['quantum_phase'].fmod_(2 * np.pi)
+
+        return loss
+
+    def fractal_brownian_motion(self, shape, hurst):
+        try:
+            noise = torch.randn(shape, device=self.param_groups[0]['params'][0].device)
+            if len(shape) > 1:
+                t = torch.arange(shape[-1], device=noise.device).float().unsqueeze(0).expand(shape[:-1] + (-1,))
+            else:
+                t = torch.arange(shape[0], device=noise.device).float()
+            return noise * (t ** hurst)
+        except Exception as e:
+            print(f"Sweetie, we've hit a snag in fractal_brownian_motion: {e}")
+            return torch.zeros(shape, device=self.param_groups[0]['params'][0].device)
+
+    def compute_entanglement_effect(self, param: torch.Tensor, strength: float) -> torch.Tensor:
+        entangled_params = [self.state[p]['exp_avg'] for p in self.param_groups[0]['params']
+                            if id(p) in self.entanglement_graph[id(param)]]
+        if not entangled_params:
+            return torch.zeros_like(param)
+        entanglement_effect = torch.mean(torch.stack(entangled_params), dim=0)
+        return strength * entanglement_effect
+
+
+class DynamicAdaptiveQuantumOps:
+    @staticmethod
+    def adaptive_base(x, base_factor=1.0):
+        return torch.where(
+            x != 0,
+            torch.sign(x) * torch.log1p(torch.abs(x)) * base_factor,
+            torch.full_like(x, 1e-8)  # Avoid exact zeros
+        )
+
+    @staticmethod
+    def inverse_adaptive_base(x, base_factor=1.0):
+        return torch.where(
+            x != 0,
+            torch.sign(x) * (torch.exp(torch.abs(x) / base_factor) - 1),
+            torch.full_like(x, 1e-8)  # Avoid exact zeros
+        )
+
+    @staticmethod
+    def apply_adaptive_modulus(x, mod):
+        mod = torch.where(mod == 0, torch.ones_like(mod), mod)  # Avoid division by zero
+        return x - mod * torch.floor(x / mod + 0.5)  # Symmetric modulo
+
+    @staticmethod
+    def avoid_zero(x, epsilon=1e-8):
+        return x + epsilon * (torch.abs(x) < epsilon).float()
+
+    @staticmethod
+    def quantum_fluctuation(x, strength=0.01):
+        return x + strength * torch.randn_like(x)
+
+    @staticmethod
+    def fractal_scaling(x, fractal_dim=1.5):
+        return torch.sign(x) * torch.abs(x).pow(fractal_dim)
+
+    @staticmethod
+    def entanglement_mix(x, y, alpha=0.5):
+        x = torch.as_tensor(x)
+        y = torch.as_tensor(y)
+        alpha = torch.as_tensor(alpha, dtype=x.dtype, device=x.device)
+        if x.shape != y.shape:
+            x, y = torch.broadcast_tensors(x, y)
+        return alpha * x + (1 - alpha) * y + torch.sqrt(alpha * (1 - alpha)) * torch.sqrt(torch.abs(x * y) + 1e-8)
+
+class QuantumFractalResonanceLayer(nn.Module):
+    def __init__(self, in_features: int, out_features: int, num_quantum_states: int = 5):
+        super(QuantumFractalResonanceLayer, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.num_quantum_states = num_quantum_states
+
+        self.input_projection = nn.Linear(in_features, out_features)
+        self.quantum_weights = nn.Parameter(torch.randn(num_quantum_states, out_features, out_features) * 0.02)
+        self.quantum_biases = nn.Parameter(torch.randn(num_quantum_states, out_features) * 0.02)
+        self.fractal_scales = nn.Parameter(torch.randn(out_features, out_features) * 0.02)
+        self.fractal_offsets = nn.Parameter(torch.randn(out_features) * 0.02)
+        self.entanglement_strength = nn.Parameter(torch.rand(out_features) * 0.02)
+        self.adaptive_base_factor = nn.Parameter(torch.rand(1) * 0.02)
+        self.adaptive_modulus_factor = nn.Parameter(torch.rand(1) * 0.2 + 1)
+        self.fractal_dimension = nn.Parameter(torch.rand(1) * 0.25 + 1.25)
+
+
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.input_projection(x)
+        x = F.relu(x)
+        x = self.normalize_output(x)
+
+        x = self.adaptive_base(x, torch.clamp(self.adaptive_base_factor, 0.1, 10))
+
+        batch_size, seq_len, _ = x.shape
+        quantum_states = torch.randint(0, self.num_quantum_states, (batch_size, seq_len), device=x.device)
+
+        weights = self.apply_adaptive_modulus(self.quantum_weights[quantum_states], torch.clamp(self.adaptive_modulus_factor, 1, 10))
+        biases = self.apply_adaptive_modulus(self.quantum_biases[quantum_states], torch.clamp(self.adaptive_modulus_factor, 1, 10))
+
+        x = torch.matmul(x.unsqueeze(-2), weights).squeeze(-2) + biases
+        x = self.normalize_output(x)
+
+        fractal_mod = torch.sin(self.apply_adaptive_modulus(
+            torch.matmul(x, self.fractal_scales) + self.fractal_offsets.unsqueeze(0).unsqueeze(0),
+            torch.clamp(self.adaptive_modulus_factor, 1, 10)
+        ))
+        x = x * (fractal_mod + 1)
+        x = self.normalize_output(x)
+
+        x = self.fractal_scaling(x, torch.clamp(self.fractal_dimension, 1, 2))
+
+        entanglement_effect = torch.tanh(self.entanglement_strength * x.mean(dim=1, keepdim=True))
+        x = self.entanglement_mix(x, entanglement_effect, alpha=0.5)
+
+        x = self.quantum_fluctuation(x, strength=0.01)
+        x = self.avoid_zero(x)
+
+        x = self.inverse_adaptive_base(x, torch.clamp(self.adaptive_base_factor, 0.1, 10))
+        x = self.normalize_output(x)
+
+        return x
+
+    def normalize_output(self, x):
+        return F.layer_norm(x, x.shape[-1:])
+
+    @staticmethod
+    def adaptive_base(x, base_factor=1.0):
+        return torch.sign(x) * torch.log1p(torch.abs(x) * base_factor)
+
+    @staticmethod
+    def inverse_adaptive_base(x, base_factor=1.0):
+        return torch.sign(x) * (torch.exp(torch.abs(x)) - 1) / base_factor
+
+    @staticmethod
+    def apply_adaptive_modulus(x, mod):
+        return x - mod * torch.floor(x / mod)
+
+    @staticmethod
+    def avoid_zero(x, epsilon=1e-6):
+        return x + epsilon
+
+    @staticmethod
+    def quantum_fluctuation(x, strength=0.01):
+        return x + strength * torch.randn_like(x)
+
+    @staticmethod
+    def fractal_scaling(x, fractal_dim):
+        return torch.sign(x) * torch.abs(x).pow(fractal_dim)
+
+    @staticmethod
+    def entanglement_mix(x, y, alpha=0.5):
+        x = torch.as_tensor(x)
+        y = torch.as_tensor(y)
+        alpha = torch.as_tensor(alpha, dtype=x.dtype, device=x.device)
+        if x.shape != y.shape:
+            x, y = torch.broadcast_tensors(x, y)
+        return alpha * x + (1 - alpha) * y + torch.sqrt(alpha * (1 - alpha)) * torch.sqrt(torch.abs(x * y) + 1e-8)
+
+
+class QuantumEntangledFractalLayer(nn.Module):
+    def __init__(self, in_features: int, out_features: int, num_quantum_states: int = 5):
+        super(QuantumEntangledFractalLayer, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.num_quantum_states = num_quantum_states
+
+        self.input_projection = nn.Linear(in_features, out_features)
+        self.quantum_weights = nn.Parameter(torch.randn(num_quantum_states, out_features, out_features))
+        self.quantum_biases = nn.Parameter(torch.randn(num_quantum_states, out_features))
+        self.fractal_scales = nn.Parameter(torch.randn(out_features, out_features))
+        self.fractal_offsets = nn.Parameter(torch.randn(out_features))
+        self.entanglement_strength = nn.Parameter(torch.rand(out_features))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.dim() == 2:
+            x = x.unsqueeze(1)
+        elif x.dim() != 3:
+            raise ValueError(f"Input tensor should be 2D or 3D, but got shape {x.shape}")
+
+        x = self.input_projection(x)
+
+        batch_size, seq_len, _ = x.shape
+
+        quantum_states = torch.randint(0, self.num_quantum_states, (batch_size, seq_len, 1), device=x.device)
+
+        chunk_size = 1024  # Adjust this based on your GPU memory
+        outputs = []
+
+        for i in range(0, batch_size, chunk_size):
+            chunk = x[i:i+chunk_size]
+            chunk_states = quantum_states[i:i+chunk_size]
+
+            weights = self.quantum_weights[chunk_states.squeeze(-1)]
+            biases = self.quantum_biases[chunk_states.squeeze(-1)]
+
+            chunk_output = torch.matmul(chunk.unsqueeze(-2), weights).squeeze(-2) + biases
+
+            fractal_mod = torch.sin(torch.matmul(chunk, self.fractal_scales) + self.fractal_offsets.unsqueeze(0).unsqueeze(0))
+            chunk_output *= fractal_mod
+
+            outputs.append(chunk_output)
+
+        output = torch.cat(outputs, dim=0)
+
+        entanglement_effect = torch.tanh(self.entanglement_strength * output.mean(dim=1, keepdim=True))
+        output += entanglement_effect
+
+        return output.squeeze(1) if seq_len == 1 else output
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.cuda.amp import autocast, GradScaler
+from torch.utils.data import DataLoader
+from transformers import AutoTokenizer, AutoModel
+from datasets import load_dataset
+from tqdm import tqdm
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
+from typing import List, Dict, Any
+import random
+from collections import Counter
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from enum import Enum, auto
+
+class NodeType(Enum):
+    STANDARD = auto()
+    HYBRID = auto()
+    NONLINEAR = auto()
+
+class SassyNode(nn.Module):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, flow_vector_dimensions: int,
+                 num_fractional_dimensions: int, num_pheromone_markers: int, num_quantum_states: int = 5):
+        super(SassyNode, self).__init__()
+        self.type = random.choice(list(NodeType))
+        self.sassy_lstm = QuantumFractalResonanceLayer(input_size, hidden_size, num_quantum_states)
+        self.fabulous_fc = QuantumFractalResonanceLayer(hidden_size, output_size, num_quantum_states)
+        self.diva_attention = nn.MultiheadAttention(hidden_size, num_heads=4)
+        self.fierce_activation = nn.Tanh()
+        self.glamorous_dropout = nn.Dropout(0.1)
+
+        self.flow_vector = nn.Parameter(torch.randn(flow_vector_dimensions))
+        self.flow_vector.data /= torch.norm(self.flow_vector.data)
+        self.adaptability = 0.2
+        self.randomness_factor = 0.01
+        self.context_strength = 0.5
+        self.attention_factor = 1.0
+        self.decay_rate = 0.04
+        self.inhibition_factor = 0.1
+        self.learning_rate = 0.04
+        self.fractional_dimensions = nn.ParameterList([nn.Parameter(torch.tensor([0.1, 0.0])) for _ in range(num_fractional_dimensions)])
+        self.nested_dimension = NestedDimension(0.01)
+        self.pheromone_markers = nn.Parameter(torch.rand(num_pheromone_markers) * 0.01)
+        self.specialization_factor = 0.5
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        lstm_out = self.sassy_lstm(x)
+        attn_out, _ = self.diva_attention(lstm_out, lstm_out, lstm_out)
+        output = self.fabulous_fc(attn_out[:, -1, :])
+        return self.fierce_activation(self.glamorous_dropout(output))
+
+
+    def strut_your_stuff(self, input_signal: torch.Tensor, neighbors: List['SassyNode']):
+        environmental_signal = self.sense_the_room(neighbors)
+        contextual_signal = self.read_the_room(neighbors)
+        attention_signal = self.steal_the_spotlight(neighbors)
+        inhibition_signal = self.throw_shade(neighbors)
+        self.adjust_your_attitude(input_signal, contextual_signal, attention_signal, inhibition_signal)
+
+    def sense_the_room(self, neighbors: List['SassyNode']) -> torch.Tensor:
+        if not neighbors:
+            return torch.zeros_like(self.fabulous_fc.quantum_weights[0])
+        return torch.mean(torch.stack([neighbor.fabulous_fc.quantum_weights[0] for neighbor in neighbors]), dim=0)
+
+    def read_the_room(self, neighbors: List['SassyNode']) -> torch.Tensor:
+        if not neighbors:
+            return torch.zeros_like(self.fabulous_fc.quantum_weights[0])
+        return torch.mean(torch.stack([neighbor.fabulous_fc.quantum_weights[0] for neighbor in neighbors]), dim=0)
+
+    def steal_the_spotlight(self, neighbors: List['SassyNode']) -> torch.Tensor:
+        if not neighbors:
+            return torch.ones_like(self.fabulous_fc.quantum_weights[0])
+        similarities = torch.stack([F.cosine_similarity(self.fabulous_fc.quantum_weights[0].flatten(),
+                                                        neighbor.fabulous_fc.quantum_weights[0].flatten(),
+                                                        dim=0) for neighbor in neighbors])
+        return torch.ones_like(self.fabulous_fc.quantum_weights[0]) * (1.0 + self.attention_factor * torch.max(similarities))
+
+    def throw_shade(self, neighbors: List['SassyNode']) -> torch.Tensor:
+        shade = torch.zeros_like(self.fabulous_fc.quantum_weights[0])
+        for neighbor in neighbors:
+            dot_product = torch.dot(self.fabulous_fc.quantum_weights[0].flatten(),
+                                    neighbor.fabulous_fc.quantum_weights[0].flatten())
+            if dot_product < 0:
+                shade += neighbor.fabulous_fc.quantum_weights[0]
+        return shade
+
+    def adjust_your_attitude(self, input_signal: torch.Tensor, contextual_signal: torch.Tensor,
+                             attention_signal: torch.Tensor, inhibition_signal: torch.Tensor):
+        input_signal_flat = input_signal.flatten()
+        flow_vector_resized = self.flow_vector[:input_signal_flat.size(0)]
+        input_dot_flow_vector = torch.dot(flow_vector_resized, input_signal_flat)
+
+        updated_weights = self.fabulous_fc.quantum_weights[0] + self.adaptability * (input_dot_flow_vector * input_signal - self.fabulous_fc.quantum_weights[0])
+        updated_weights *= attention_signal
+        updated_weights -= self.inhibition_factor * inhibition_signal
+
+        for fd in self.fractional_dimensions:
+            updated_weights *= fd[1].pow(0.1)
+
+        def apply_nested_dimension(dimension: NestedDimension, weight: float):
+            nonlocal updated_weights
+            updated_weights *= dimension.get_value() ** weight
+            for child in dimension.get_children():
+                apply_nested_dimension(child, weight * 0.5)
+
+        apply_nested_dimension(self.nested_dimension, 1.0)
+
+        # Use .data for in-place assignment
+        self.fabulous_fc.quantum_weights[0].data = updated_weights.data
+
+    def add_some_spice(self):
+        random_signal = torch.randn_like(self.fabulous_fc.quantum_weights[0])
+        # Instead of in-place addition, we create a new tensor
+        spiced_weights = self.fabulous_fc.quantum_weights[0] + self.randomness_factor * random_signal
+        # Now we update the parameter using .data to avoid tracking history
+        self.fabulous_fc.quantumweights[0].data.copy(spiced_weights)
+
+    def werk_it(self, environmental_signal: torch.Tensor):
+        norm = torch.norm(environmental_signal)
+        if norm > 0:
+            # Ensure that flow_vector and environmental_signal have the same size
+            min_size = min(self.flow_vector.size(0), environmental_signal.numel())
+            flow_vector_resized = self.flow_vector[:min_size]
+            environmental_signal_flat = environmental_signal.flatten()[:min_size]
+
+            flow_dot_environment = torch.dot(flow_vector_resized, environmental_signal_flat) / norm
+
+            # Resize the result to match quantum_weights
+            result = flow_dot_environment * environmental_signal / norm
+            result_resized = F.interpolate(result.unsqueeze(0).unsqueeze(0),
+                                           size=self.fabulous_fc.quantum_weights[0].shape,
+                                           mode='linear',
+                                           align_corners=False).squeeze(0).squeeze(0)
+
+            self.fabulous_fc.quantum_weights[0] += self.adaptability * (result_resized - self.fabulous_fc.quantum_weights[0])
+
+    def cool_down(self):
+        self.fabulous_fc.quantum_weights[0] *= (1.0 - self.decay_rate)
+
+    def spread_the_tea(self, neighbors: List['SassyNode']):
+        avg_pheromones = torch.mean(torch.stack([neighbor.pheromone_markers for neighbor in neighbors]), dim=0)
+        self.pheromone_markers.data = 0.9 * self.pheromone_markers.data + 0.1 * avg_pheromones
+
+    def spill_the_tea(self):
+        self.pheromone_markers.data += 0.1
+
+    def level_up(self, neighbors: List['SassyNode']):
+        avg_specialization = torch.mean(torch.tensor([neighbor.specialization_factor for neighbor in neighbors]))
+        self.specialization_factor = 0.9 * self.specialization_factor + 0.1 * avg_specialization
+        if random.random() < self.specialization_factor:
+            self.type = random.choice(list(NodeType))  # Use NodeType here, not self.NodeType
+
+class FabulousLattice(nn.Module):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_nodes: int,
+                 flow_vector_dimensions: int, num_fractional_dimensions: int, num_pheromone_markers: int,
+                 num_quantum_states: int):
+        super(FabulousLattice, self).__init__()
+        self.nodes = nn.ModuleList([SassyNode(input_size, hidden_size, output_size, flow_vector_dimensions,
+                                              num_fractional_dimensions, num_pheromone_markers, num_quantum_states)
+                                    for _ in range(num_nodes)])
+        self.entanglement_strength = nn.Parameter(torch.rand(num_nodes))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        node_outputs = [node(x) for node in self.nodes]
+        entangled_outputs = self.apply_entanglement(node_outputs)
+        return torch.stack(entangled_outputs).mean(dim=0)
+
+    def apply_entanglement(self, node_outputs: List[torch.Tensor]) -> List[torch.Tensor]:
+        entangled_outputs = []
+        for i, output in enumerate(node_outputs):
+            entanglement_effect = torch.sum(torch.stack([
+                self.entanglement_strength[j] * node_outputs[j]
+                for j in range(len(node_outputs)) if i != j
+            ]), dim=0)
+            entangled_output = output + 0.1 * entanglement_effect  # 0.1 is an arbitrary scale factor
+            entangled_outputs.append(entangled_output)
+        return entangled_outputs
+
+    def update_interactions(self, other_lattices: List['FabulousLattice']):
+        for node in self.nodes:
+            other_nodes = [other_node for lattice in other_lattices for other_node in lattice.nodes]
+            node.strut_your_stuff(node.fabulous_fc.quantum_weights[0], other_nodes)
+            node.add_some_spice()
+            node.werk_it(node.sense_the_room(other_nodes))
+            node.cool_down()
+            node.spread_the_tea(other_nodes)
+            node.spill_the_tea()
+            node.level_up(other_nodes)
+
+class DivaMultiscaleLattice(nn.Module):
+    def __init__(self, input_size: int, hidden_sizes: List[int], output_size: int, num_nodes: List[int],
+                 flow_vector_dimensions: int, num_fractional_dimensions: int, num_pheromone_markers: int,
+                 num_quantum_states: int):
+        super(DivaMultiscaleLattice, self).__init__()
+        self.lattices = nn.ModuleList([
+            FabulousLattice(input_size, hidden_size, output_size, num_node, flow_vector_dimensions,
+                            num_fractional_dimensions, num_pheromone_markers, num_quantum_states)
+            for hidden_size, num_node in zip(hidden_sizes, num_nodes)
+        ])
+        self.scale_weights = nn.Parameter(torch.rand(len(hidden_sizes)))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        lattice_outputs = [lattice(x) for lattice in self.lattices]
+        scaled_outputs = [output * weight for output, weight in zip(lattice_outputs, self.scale_weights)]
+        return torch.stack(scaled_outputs).sum(dim=0)
+
+    def update_interactions(self):
+        for i, lattice in enumerate(self.lattices):
+            other_lattices = [other_lattice for other_lattice in self.lattices if other_lattice != lattice]
+            lattice.update_interactions(other_lattices)
+
+    def apply_quantum_interference(self):
+        for i in range(len(self.lattices)):
+            for j in range(i+1, len(self.lattices)):
+                self.quantum_interfere(self.lattices[i], self.lattices[j])
+
+    def quantum_interfere(self, lattice1: FabulousLattice, lattice2: FabulousLattice):
+        for node1, node2 in zip(lattice1.nodes, lattice2.nodes):
+            interference = torch.cos(node1.fabulous_fc.quantum_weights[0] - node2.fabulous_fc.quantum_weights[0])
+            node1.fabulous_fc.quantum_weights[0] += 0.01 * interference
+            node2.fabulous_fc.quantum_weights[0] += 0.01 * interference
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.cuda.amp import autocast, GradScaler
+from torch.utils.data import DataLoader
+from transformers import AutoTokenizer, AutoModel
+from datasets import load_dataset
+from tqdm import tqdm
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
+from typing import List, Dict, Any
+import random
+from collections import Counter
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+import logging
+from torch.cuda.amp import autocast, GradScaler
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.cuda.amp import autocast, GradScaler
+from tqdm import tqdm
+import numpy as np
+import logging
+import numpy as np
+from collections import Counter
+
+
+class FluidLatticeAI(nn.Module):
+    def __init__(self, vocab_size, embed_dim, hidden_sizes, output_size, num_quantum_states):
+        super(FluidLatticeAI, self).__init__()
+        self.embedding = nn.Embedding(vocab_size, embed_dim)
+        self.encoder = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=8, batch_first=True)
+        self.output_layer = nn.Linear(embed_dim, 2)  # 2 for start and end logits
+        self.loss_fn = nn.CrossEntropyLoss()
+
+    def forward(self, input_ids, attention_mask=None, start_positions=None, end_positions=None):
+        x = self.embedding(input_ids)
+        x = self.encoder(x, src_key_padding_mask=~attention_mask.bool() if attention_mask is not None else None)
+        logits = self.output_layer(x)
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
+
+        loss = None
+        if start_positions is not None and end_positions is not None:
+            loss = self.loss_fn(start_logits, start_positions) + self.loss_fn(end_logits, end_positions)
+
+        return start_logits, end_logits, loss
+
+
+import numpy as np
+import random
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.cuda.amp import autocast, GradScaler
+import requests
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+from transformers import AutoTokenizer, AutoModel
+from datasets import load_dataset
+import logging
+import os
+
+class FabulousAGI:
+    def __init__(self, vocab_size, embed_dim, hidden_sizes, output_size, num_nodes,
+                 flow_vector_dimensions, num_fractional_dimensions, num_pheromone_markers,
+                 num_quantum_states, device, verbose=False):
+        self.device = device
+        self.verbose = verbose
+        self.vocab_size = vocab_size
+        self.embed_dim = embed_dim
+        self.hidden_sizes = hidden_sizes
+        self.output_size = output_size
+        self.num_nodes = num_nodes
+        self.flow_vector_dimensions = flow_vector_dimensions
+        self.num_fractional_dimensions = num_fractional_dimensions
+        self.num_pheromone_markers = num_pheromone_markers
+        self.num_quantum_states = num_quantum_states
+
+        self.fluid_lattice_ai = FluidLatticeAI(
+            vocab_size,
+            embed_dim,
+            hidden_sizes,
+            output_size,
+            num_quantum_states
+        ).to(device)
+
+        self.optimizer = QuantumEntangledFractalOptimizer(
+            self.fluid_lattice_ai.parameters(),
+            lr=0.001,
+            betas=(0.9, 0.999),
+            eps=1e-8,
+            weight_decay=0.01,
+            hurst=0.75,
+            entanglement_strength=0.05
+        )
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5, patience=2, verbose=True)
+
+        self.loss_fn = nn.CrossEntropyLoss()
+
+        self.metrics = {
+            'accuracy': [], 'precision': [], 'recall': [], 'f1': [], 'loss': [], 'exact_match': []
+        }
+        self.task_performances = {}
+        self.conversation_history = []
+
+        self.tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+        self.language_model = AutoModel.from_pretrained("distilbert-base-uncased").to(self.device)
+
+        self.dictionary_api_url = "https://api.dictionaryapi.dev/api/v2/entries/en/"
+        self.datamuse_api_url = "https://api.datamuse.com/words"
+        self.synonym_cache = {}
+
+        self.setup_logger()
+
+    def setup_logger(self):
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO if self.verbose else logging.WARNING)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+
+    def save_model(self, save_path: str, epoch: int, avg_loss: float):
+        """Saves the model, optimizer state, and current metrics."""
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': self.fluid_lattice_ai.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'loss': avg_loss,
+            'metrics': self.metrics
+        }, save_path)
+        print(f"Model saved to {save_path}")
+
+    def load_model(self, load_path: str):
+        """Loads the model, optimizer state, and metrics from a checkpoint."""
+        if os.path.isfile(load_path):
+            checkpoint = torch.load(load_path)
+            self.fluid_lattice_ai.load_state_dict(checkpoint['model_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            self.metrics = checkpoint.get('metrics', {})
+            print(f"Model loaded from {load_path}, resuming from epoch {checkpoint['epoch']}")
+        else:
+            print(f"No checkpoint found at {load_path}")
+
+    def load_dataset(self, dataset_name: str, split: str = "train"):
+        print(f"Loading dataset...")
+        try:
+            self.dataset = load_dataset(dataset_name, split=split)
+            self.logger.info(f"Loaded dataset: {dataset_name}, split: {split}")
+            self.logger.info(f"Number of samples: {len(self.dataset)}")
+            self.logger.info(f"Sample data point: {self.dataset[0]}")
+        except Exception as e:
+            self.logger.error(f"Oh honey, we hit a snag while loading the dataset: {e}")
+            self.logger.info("Don't worry, we'll figure this out!")
+
+    def preprocess_function(self, examples):
+        questions = [q.strip() for q in examples["question"]]
+        inputs = self.tokenizer(
+            questions,
+            examples["context"],
+            max_length=384,
+            truncation="only_second",
+            return_offsets_mapping=True,
+            padding="max_length",
+        )
+
+        offset_mapping = inputs.pop("offset_mapping")
+        answers = examples["answers"]
+        start_positions = []
+        end_positions = []
+
+        for i, offset in enumerate(offset_mapping):
+            answer = answers[i]
+            start_char = answer["answer_start"][0]
+            end_char = answer["answer_start"][0] + len(answer["text"][0])
+            sequence_ids = inputs.sequence_ids(i)
+
+            idx = 0
+            while sequence_ids[idx] != 1:
+                idx += 1
+            context_start = idx
+            while sequence_ids[idx] == 1:
+                idx += 1
+            context_end = idx - 1
+
+            if offset[context_start][0] > end_char or offset[context_end][1] < start_char:
+                start_positions.append(0)
+                end_positions.append(0)
+            else:
+                idx = context_start
+                while idx <= context_end and offset[idx][0] <= start_char:
+                    idx += 1
+                start_positions.append(idx - 1)
+
+                idx = context_end
+                while idx >= context_start and offset[idx][1] >= end_char:
+                    idx -= 1
+                end_positions.append(idx + 1)
+
+        inputs["start_positions"] = start_positions
+        inputs["end_positions"] = end_positions
+        return inputs
+
+    def get_word_meaning(self, word: str) -> Optional[str]:
+        """Fetches the meaning of a word from the Free Dictionary API."""
+        try:
+            response = requests.get(f"{self.dictionary_api_url}{word}")
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, list) and "meanings" in data[0]:
+                meanings = data[0]["meanings"]
+                if meanings:
+                    definitions = meanings[0]["definitions"]
+                    if definitions:
+                        return definitions[0]["definition"]
+            return None
+        except requests.RequestException as e:
+            print(f"Error fetching meaning for {word}: {e}")
+            return None
+
+    def query_datamuse(self, word: str) -> List[str]:
+        """Fetches synonyms for a word from the Datamuse API."""
+        if word in self.synonym_cache:
+            return self.synonym_cache[word]
+
+        params = {
+            "rel_syn": word,
+            "max": 10  # Limit to 10 synonyms
+        }
+        try:
+            response = requests.get(self.datamuse_api_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            synonyms = [item['word'] for item in data if item['word'] != word]
+            self.synonym_cache[word] = synonyms
+            return synonyms
+        except requests.RequestException as e:
+            print(f"Error querying Datamuse API: {e}")
+            return []
+
+    def get_synonym(self, word: str) -> Optional[str]:
+        """Gets a synonym for a word using Datamuse API or word embeddings."""
+        api_synonyms = self.query_datamuse(word)
+
+        if api_synonyms:
+            return random.choice(api_synonyms)
+
+        tokens = self.tokenizer.tokenize(word)
+        if not tokens:
+            return None
+
+        with torch.no_grad():
+            inputs = self.tokenizer(word, return_tensors="pt")
+            outputs = self.language_model(**inputs)
+            word_embedding = outputs.last_hidden_state.mean(dim=1)
+
+        all_embeddings = self.language_model.embeddings.word_embeddings.weight
+        similarities = nn.functional.cosine_similarity(word_embedding, all_embeddings)
+        top_indices = similarities.argsort(descending=True)[1:11]
+        similar_words = [self.tokenizer.convert_ids_to_tokens(idx.item()) for idx in top_indices]
+        valid_synonyms = [w for w in similar_words if not w.startswith('##') and w != word]
+
+        return random.choice(valid_synonyms) if valid_synonyms else None
+
+    def word_swap(self, sentence: str) -> str:
+        """Swaps words in a sentence with their synonyms."""
+        words = self.tokenizer.tokenize(sentence)
+        for i in range(len(words)):
+            if random.random() < 0.1:
+                synonym = self.get_synonym(words[i])
+                if synonym:
+                    words[i] = synonym
+        return self.tokenizer.convert_tokens_to_string(words)
+
+    def train(self, num_epochs: int, batch_size: int, save_path: str = "fabulous_agi_model.pth"):
+        print("Starting training...")
+        tokenized_dataset = self.dataset.map(self.preprocess_function, batched=True, remove_columns=self.dataset.column_names)
+        tokenized_dataset.set_format("torch")
+        train_loader = DataLoader(tokenized_dataset, batch_size=batch_size, shuffle=True)
+
+        initial_lr = 1e-3
+        self.optimizer = optim.AdamW(self.fluid_lattice_ai.parameters(), lr=initial_lr, weight_decay=0.005)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=num_epochs)
+        scaler = GradScaler()
+
+        for epoch in range(num_epochs):
+            self.fluid_lattice_ai.train()
+            total_loss = 0
+            progress_bar = tqdm(total=len(train_loader), desc=f"Epoch {epoch+1}/{num_epochs}")
+
+            for batch_idx, batch in enumerate(train_loader):
+                input_ids = batch['input_ids'].to(self.device)
+                attention_mask = batch['attention_mask'].to(self.device)
+                start_positions = batch['start_positions'].to(self.device)
+                end_positions = batch['end_positions'].to(self.device)
+
+                self.optimizer.zero_grad()
+                with autocast():
+                    _, _, loss = self.fluid_lattice_ai(input_ids, attention_mask=attention_mask,
+                                                       start_positions=start_positions, end_positions=end_positions)
+                scaler.scale(loss).backward()
+
+                scaler.unscale_(self.optimizer)
+                torch.nn.utils.clip_grad_norm_(self.fluid_lattice_ai.parameters(), max_norm=1.0)
+
+                scaler.step(self.optimizer)
+                scaler.update()
+                total_loss += loss.item()
+
+                if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(train_loader):
+                    avg_loss = total_loss / (batch_idx + 1)
+                    current_lr = self.optimizer.param_groups[0]['lr']
+                    progress_bar.set_postfix({'loss': f'{avg_loss:.4f}', 'lr': f'{current_lr:.6f}'})
+                    progress_bar.update(100 if batch_idx + 1 < len(train_loader) else len(train_loader) % 100)
+
+            avg_loss = total_loss / len(train_loader)
+            print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}")
+
+            # Save the model
+            self.save_model(save_path, epoch + 1, avg_loss)
+
+            scheduler.step()
+            if (epoch + 1) % 5 == 0 or epoch == num_epochs - 1:
+                self.evaluate()
+
+    def evaluate(self):
+        self.logger.info("Evaluating the model...")
+        self.fluid_lattice_ai.eval()
+
+        eval_dataset = self.dataset.map(self.preprocess_function, batched=True, remove_columns=self.dataset.column_names)
+        eval_dataset.set_format("torch")
+        eval_loader = DataLoader(eval_dataset, batch_size=16, shuffle=False)
+
+        all_start_logits = []
+        all_end_logits = []
+        all_start_positions = []
+        all_end_positions = []
+        total_loss = 0
+
+        with torch.no_grad():
+            for batch in tqdm(eval_loader, desc="Evaluating", disable=not self.verbose):
+                inputs = {k: v.to(self.device) for k, v in batch.items() if k != "example_id"}
+                start_logits, end_logits, loss = self.fluid_lattice_ai(**inputs)
+
+                total_loss += loss.item()
+
+                all_start_logits.append(start_logits.cpu().numpy())
+                all_end_logits.append(end_logits.cpu().numpy())
+                all_start_positions.append(inputs["start_positions"].cpu().numpy())
+                all_end_positions.append(inputs["end_positions"].cpu().numpy())
+
+        all_start_logits = np.concatenate(all_start_logits)
+        all_end_logits = np.concatenate(all_end_logits)
+        all_start_positions = np.concatenate(all_start_positions)
+        all_end_positions = np.concatenate(all_end_positions)
+
+        exact_match, f1 = self.compute_metrics(all_start_logits, all_end_logits, all_start_positions, all_end_positions)
+        avg_loss = total_loss / len(eval_loader)
+
+        self.update_metric("loss", avg_loss)
+        self.update_metric("exact_match", exact_match)
+        self.update_metric("f1", f1)
+
+        self.logger.info(f"Evaluation results: Loss: {avg_loss:.4f}, Exact Match: {exact_match:.4f}, F1: {f1:.4f}")
+
+    def compute_metrics(self, start_logits, end_logits, start_positions, end_positions):
+        start_pred = np.argmax(start_logits, axis=1)
+        end_pred = np.argmax(end_logits, axis=1)
+
+        exact_match = (start_pred == start_positions) & (end_pred == end_positions)
+        exact_match = exact_match.mean()
+
+        f1_scores = []
+        for sp, ep, spr, epr in zip(start_positions, end_positions, start_pred, end_pred):
+            pred_tokens = set(range(spr, epr + 1))
+            true_tokens = set(range(sp, ep + 1))
+            common_tokens = pred_tokens.intersection(true_tokens)
+
+            if len(pred_tokens) == 0 or len(true_tokens) == 0:
+                f1_scores.append(0)
+            else:
+                precision = len(common_tokens) / len(pred_tokens)
+                recall = len(common_tokens) / len(true_tokens)
+                f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+                f1_scores.append(f1)
+
+        return exact_match, np.mean(f1_scores)
+
+    def generate_response(self, context: str, question: str) -> str:
+        """Generates a response based on the provided context and question."""
+        self.fluid_lattice_ai.eval()
+        inputs = self.tokenizer(question, context, return_tensors="pt")
+        input_ids = inputs["input_ids"].to(self.device)
+        attention_mask = inputs["attention_mask"].to(self.device)
+
+        with torch.no_grad():
+            outputs = self.fluid_lattice_ai(input_ids, attention_mask=attention_mask)
+            start_logits, end_logits = outputs.split(1, dim=-1)
+            start_logits = start_logits.squeeze(-1)
+            end_logits = end_logits.squeeze(-1)
+
+        start_index = torch.argmax(start_logits)
+        end_index = torch.argmax(end_logits)
+
+        answer = self.tokenizer.decode(input_ids[0][start_index:end_index+1])
+
+        # Optionally get a word meaning for the answer
+        if answer:
+            word_meaning = self.get_word_meaning(answer.split()[0])
+            if word_meaning:
+                print(f"Meaning of '{answer.split()[0]}': {word_meaning}")
+
+        return answer
+
+    def simple_bleu_score(self, reference, candidate, max_n=4):
+        def ngrams(tokens, n):
+            return Counter(zip(*[tokens[i:] for i in range(n)]))
+
+        if len(candidate) == 0:
+            return 0
+
+        ref_len = len(reference)
+        cand_len = len(candidate)
+
+        clip_len = min(ref_len, cand_len)
+
+        totals = [0] * max_n
+        for n in range(1, max_n + 1):
+            ref_ngrams = ngrams(reference, n)
+            cand_ngrams = ngrams(candidate, n)
+            totals[n-1] = sum(min(ref_ngrams[ng], cand_ngrams[ng]) for ng in cand_ngrams)
+
+        weights = [1/max_n] * max_n
+        score = np.exp(sum(w * np.log(total/(clip_len-n+1)) for n, (total, w) in enumerate(zip(totals, weights), 1)))
+
+        bp = 1 if cand_len > ref_len else np.exp(1 - ref_len/cand_len)
+        return bp * score
+
+    def visualize_metrics(self):
+        print("Get ready for some chart-topping hits, honey!")
+        plt.figure(figsize=(20, 15))
+        metrics_to_plot = ['accuracy', 'f1', 'exact_match', 'loss']
+
+        for i, metric in enumerate(metrics_to_plot, 1):
+            plt.subplot(2, 2, i)
+            plt.plot(self.metrics[metric])
+            plt.title(metric.capitalize())
+            plt.xlabel('Evaluation Step')
+            plt.ylabel('Score')
+
+        plt.tight_layout()
+        plt.show()
+
+    def update_metric(self, metric_name: str, value: float):
+        if metric_name in self.metrics:
+            if isinstance(self.metrics[metric_name], list):
+                self.metrics[metric_name].append(value)
+            else:
+                self.metrics[metric_name] = value
+
+    def adapt(self):
+        print("Time to evolve, darling! Let's make this AI more fabulous than ever!")
+        if np.mean(self.metrics['f1'][-5:]) < 0.3:
+            self.add_quantum_layer()
+        elif np.mean(self.metrics['f1'][-5:]) > 0.7:
+            self.remove_quantum_layer()
+
+        if np.mean(self.metrics['loss'][-5:]) > np.mean(self.metrics['loss'][-10:-5]):
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] *= 0.9
+
+        self.quantum_annealing()
+
+    def add_quantum_layer(self):
+        print("Adding a fabulous new quantum layer!")
+        new_layer = nn.Linear(self.hidden_sizes[-1], self.hidden_sizes[-1])
+        new_layer.to(self.device)
+        self.fluid_lattice_ai.quantum_layers.extend([new_layer, nn.ReLU(), nn.Dropout(0.1)])
+
+    def remove_quantum_layer(self):
+        print("Streamlining our quantum layers, honey!")
+        if len(self.fluid_lattice_ai.quantum_layers) > 3:
+            self.fluid_lattice_ai.quantum_layers = self.fluid_lattice_ai.quantum_layers[:-3]
+
+    def quantum_annealing(self):
+        print("Quantum annealing? More like quantum fabulizing, honey!")
+        T = 1.0
+        T_min = 0.01
+        alpha = 0.9
+
+        while T > T_min:
+            current_energy = np.mean(self.metrics['loss'][-5:])
+
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] *= np.exp(np.random.uniform(-0.1, 0.1))
+
+            self.evaluate()
+            new_energy = np.mean(self.metrics['loss'][-5:])
+
+            if new_energy < current_energy or np.random.random() < np.exp((current_energy - new_energy) / T):
+                print("Yass queen! We're looking fierce with these new hyperparameters!")
+            else:
+                for param_group in self.optimizer.param_groups:
+                    param_group['lr'] /= np.exp(np.random.uniform(-0.1, 0.1))
+                print("Hmm, that look didn't work. Back to our signature style!")
+
+            T *= alpha
+
+    def data_augmentation(self, context: str, question: str) -> List[Tuple[str, str]]:
+        print("Let's spice up this data, shall we?")
+        augmented = []
+
+        # Question dropout
+        question_tokens = self.tokenizer.tokenize(question)
+        dropout_question = ' '.join([t for t in question_tokens if random.random() > 0.1])
+        augmented.append((context, dropout_question))
+
+        # Question word swap
+        swapped_question = self.word_swap(question)
+        augmented.append((context, swapped_question))
+
+        # Context truncation
+        truncated_context = ' '.join(context.split()[:len(context.split())//2])
+        augmented.append((truncated_context, question))
+
+        return augmented
+
+def main():
+    print("Welcome to the Fabulous AGI Show, darling! Let's make some AI magic!")
+    vocab_size = 30522  # DistilBERT vocabulary size
+    embed_dim = 128
+    hidden_sizes = [256, 128]
+    output_size = 2  # Start and end positions for SQuAD
+    num_nodes = [18, 18, 18]
+    flow_vector_dimensions = 8
+    num_fractional_dimensions = 8
+    num_pheromone_markers = 8
+    num_quantum_states = 66
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Honey, we're running on {device}. Let's hope it's not a potato!")
+
+    try:
+        agi = FabulousAGI(vocab_size, embed_dim, hidden_sizes, output_size, num_nodes,
+                          flow_vector_dimensions, num_fractional_dimensions, num_pheromone_markers,
+                          num_quantum_states, device, verbose=False)
+        print("Loading dataset...")
+        agi.load_dataset("squad", split="train")
+
+        print("Time to train this AI like it's on RuPaul's Drag Race!")
+        agi.train(num_epochs=1000, batch_size=128)  # Adjust as needed
+
+        print("AGI is ready to serve you some sass, honey!")
+        while True:
+            context = input("Context (or type 'quit' to exit): ")
+            if context.lower() == 'quit':
+                break
+            question = input("Question: ")
+
+            augmented_inputs = agi.data_augmentation(context, question)
+            responses = []
+            for aug_context, aug_question in augmented_inputs:
+                response = agi.generate_response(aug_context, aug_question)
+                responses.append(response)
+            final_response = max(set(responses), key=responses.count)
+            print(f"AGI: {final_response}")
+
+            agi.adapt()
+            agi.quantum_annealing()
+
+            print("\nCurrent Metrics:")
+            for metric in ['loss', 'exact_match', 'f1']:
+                if agi.metrics[metric]:
+                    print(f"{metric.capitalize()}: {agi.metrics[metric][-1]:.4f}")
+
+        print("Serving you some hot metric visuals, sweetie!")
+        agi.visualize_metrics()
+
+        print("AGI system shutting down. Remember darling, in the world of AI, you're always fabulous!")
+
+    except Exception as e:
+        print(f"Oh no, sweetie! We hit a major snag: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    main()

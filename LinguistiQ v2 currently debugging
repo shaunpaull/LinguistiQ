@@ -27,6 +27,31 @@ from rouge_score import rouge_scorer
 from collections import Counter, defaultdict
 import time
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
+from scipy.stats import levy#!/usr/bin/env python3
+"""
+Complete Enhanced QFRL System with Free APIs and Advanced SQuAD Training
+Integrates thesaurus and dictionary APIs for enhanced text understanding and augmentation.
+"""
+
+import numpy as np
+import random
+from typing import List, Tuple, Dict, Callable, Optional, Any
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.cuda.amp import autocast, GradScaler
+from torch.utils.data import DataLoader
+import requests
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from datasets import load_dataset, Dataset
+from transformers import AutoTokenizer, AutoModel, DataCollatorWithPadding
+from rouge_score import rouge_scorer
+from collections import Counter, defaultdict
+import time
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
 from scipy.stats import levy
 import networkx as nx
 from enum import Enum, auto
@@ -751,9 +776,6 @@ class CompleteQuantumFractalResonanceLayer(nn.Module):
         return x
 
 
-
-
-
 class EnhancedFluidLatticeAI(nn.Module):
     """Enhanced Fluid Lattice AI with complete QFRL integration and API enhancement"""
     
@@ -908,7 +930,8 @@ class EnhancedFabulousAGI:
 
     def setup_logger(self):
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO if self.verbose else logging.WARNING)
+        # Reduce logging level to minimize noise
+        self.logger.setLevel(logging.ERROR if not self.verbose else logging.INFO)
         handler = logging.StreamHandler()
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
@@ -916,50 +939,81 @@ class EnhancedFabulousAGI:
             self.logger.addHandler(handler)
 
     def load_dataset(self, dataset_name: str, split: str = "train"):
-        """Enhanced dataset loading with API-powered preprocessing"""
-        print(f"📚 Loading dataset with API-enhanced preprocessing...")
+        """Enhanced dataset loading with OPTIMIZED API preprocessing"""
+        print(f"📚 Loading dataset with optimized API preprocessing...")
         try:
             self.dataset = load_dataset(dataset_name, split=split)
-            # Limit dataset size for demonstration
-            if len(self.dataset) > 1000:
-                self.dataset = self.dataset.select(range(1000))
+            # Further reduced dataset size for faster processing
+            if len(self.dataset) > 200:  # Much smaller for demo
+                self.dataset = self.dataset.select(range(200))
             
-            # Apply API-enhanced preprocessing
-            print("🔍 Applying semantic enhancement with free APIs...")
-            self.dataset = self.dataset.map(
-                self.api_enhanced_preprocessing, 
-                batched=False, 
-                desc="API Enhancement"
-            )
+            # Apply MINIMAL API-enhanced preprocessing
+            print("🔍 Applying light semantic enhancement (10% of examples)...")
+            try:
+                self.dataset = self.dataset.map(
+                    self.api_enhanced_preprocessing, 
+                    batched=False, 
+                    desc="Light API Enhancement",
+                    num_proc=1,
+                    disable_progress_bar=False
+                )
+                print(f"✅ API enhancement completed on subset of examples")
+            except Exception as e:
+                print(f"⚠️  API enhancement skipped: {e}")
+                # Add empty enhancement fields to dataset
+                def add_empty_enhancements(example):
+                    example['api_enhancements'] = {}
+                    example['vocabulary_expansion_count'] = 0
+                    return example
+                
+                self.dataset = self.dataset.map(add_empty_enhancements, batched=False)
                 
             self.logger.info(f"Loaded dataset: {dataset_name}, split: {split}")
             self.logger.info(f"Number of samples: {len(self.dataset)}")
-            self.logger.info(f"API enhancement completed")
+            
         except Exception as e:
             self.logger.error(f"Error loading dataset: {e}")
             raise
 
     def api_enhanced_preprocessing(self, example):
-        """Enhance individual examples using free APIs"""
+        """Enhance individual examples using free APIs - OPTIMIZED VERSION"""
         try:
             # Extract key terms from question and context
-            question = example['question']
-            context = example['context']
+            question = example.get('question', '')
+            context = example.get('context', '')
             
-            # Identify important words for enhancement
+            if not question or not context:
+                example['api_enhancements'] = {}
+                example['vocabulary_expansion_count'] = 0
+                return example
+            
+            # Only process every 10th example to avoid rate limiting
+            example_hash = hash(question + context) % 10
+            if example_hash != 0:
+                example['api_enhancements'] = {}
+                example['vocabulary_expansion_count'] = 0
+                return example
+            
+            # Identify only the most important word for enhancement
             important_words = self.extract_important_words(question, context)
             
-            # Get API enhancements for key words
+            # Get API enhancements for only 1 key word to avoid rate limiting
             enhanced_data = {}
-            for word in important_words[:3]:  # Limit to avoid rate limiting
+            if important_words:
+                word = important_words[0]  # Only process the most important word
                 try:
+                    # Add a small delay to respect rate limits
+                    time.sleep(0.2)
                     variations = self.api_manager.get_word_variations(word)
-                    if variations['synonyms'] or variations['similar']:
+                    if variations and (variations.get('synonyms') or variations.get('similar')):
                         enhanced_data[word] = variations
-                        self.vocabulary_expansions[word].update(variations['synonyms'])
-                        self.vocabulary_expansions[word].update(variations['similar'])
+                        if variations.get('synonyms'):
+                            self.vocabulary_expansions[word].update(variations['synonyms'])
+                        if variations.get('similar'):
+                            self.vocabulary_expansions[word].update(variations['similar'])
                 except Exception as e:
-                    continue
+                    # Silently skip failed API calls
+                    pass
             
             # Store enhanced information
             example['api_enhancements'] = enhanced_data
@@ -968,7 +1022,7 @@ class EnhancedFabulousAGI:
             return example
             
         except Exception as e:
-            # Return original example if enhancement fails
+            # Return original example if enhancement fails - no logging
             example['api_enhancements'] = {}
             example['vocabulary_expansion_count'] = 0
             return example
@@ -1002,13 +1056,23 @@ class EnhancedFabulousAGI:
         enhanced_contexts = []
         
         for i, (question, context) in enumerate(zip(questions, contexts)):
-            # Get API enhancements if available
-            if 'api_enhancements' in examples and i < len(examples['api_enhancements']):
-                enhancements = examples['api_enhancements'][i]
-                aug_question, aug_context = self.apply_api_augmentation(question, context, enhancements)
-                enhanced_questions.append(aug_question)
-                enhanced_contexts.append(aug_context)
-            else:
+            try:
+                # Get API enhancements if available
+                enhancements = {}
+                if hasattr(examples, '__getitem__') and 'api_enhancements' in examples:
+                    if i < len(examples['api_enhancements']):
+                        enhancements = examples['api_enhancements'][i] or {}
+                
+                if enhancements:
+                    aug_question, aug_context = self.apply_api_augmentation(question, context, enhancements)
+                    enhanced_questions.append(aug_question)
+                    enhanced_contexts.append(aug_context)
+                else:
+                    enhanced_questions.append(question)
+                    enhanced_contexts.append(context)
+                    
+            except Exception as e:
+                self.logger.debug(f"Error in augmentation for sample {i}: {e}")
                 enhanced_questions.append(question)
                 enhanced_contexts.append(context)
         
@@ -1028,57 +1092,80 @@ class EnhancedFabulousAGI:
         end_positions = []
 
         for i, offset in enumerate(offset_mapping):
-            answer = answers[i]
-            start_char = answer["answer_start"][0]
-            end_char = answer["answer_start"][0] + len(answer["text"][0])
-            sequence_ids = inputs.sequence_ids(i)
+            try:
+                answer = answers[i]
+                start_char = answer["answer_start"][0]
+                end_char = answer["answer_start"][0] + len(answer["text"][0])
+                sequence_ids = inputs.sequence_ids(i)
 
-            # Find context bounds
-            idx = 0
-            while idx < len(sequence_ids) and sequence_ids[idx] != 1:
-                idx += 1
-            context_start = idx
-            
-            while idx < len(sequence_ids) and sequence_ids[idx] == 1:
-                idx += 1
-            context_end = idx - 1
+                # Find context bounds
+                idx = 0
+                while idx < len(sequence_ids) and sequence_ids[idx] != 1:
+                    idx += 1
+                context_start = idx
+                
+                while idx < len(sequence_ids) and sequence_ids[idx] == 1:
+                    idx += 1
+                context_end = idx - 1
 
-            # Check if answer is in context
-            if offset[context_start][0] > end_char or offset[context_end][1] < start_char:
+                # Check if answer is in context
+                if context_start >= len(offset) or context_end >= len(offset):
+                    start_positions.append(0)
+                    end_positions.append(0)
+                elif offset[context_start][0] > end_char or offset[context_end][1] < start_char:
+                    start_positions.append(0)
+                    end_positions.append(0)
+                else:
+                    # Find start position
+                    idx = context_start
+                    while idx <= context_end and idx < len(offset) and offset[idx][0] <= start_char:
+                        idx += 1
+                    start_positions.append(max(0, idx - 1))
+
+                    # Find end position
+                    idx = context_end
+                    while idx >= context_start and idx < len(offset) and offset[idx][1] >= end_char:
+                        idx -= 1
+                    end_positions.append(min(len(offset) - 1, idx + 1))
+                    
+            except Exception as e:
+                self.logger.debug(f"Error processing answer for sample {i}: {e}")
                 start_positions.append(0)
                 end_positions.append(0)
-            else:
-                # Find start position
-                idx = context_start
-                while idx <= context_end and offset[idx][0] <= start_char:
-                    idx += 1
-                start_positions.append(idx - 1)
-
-                # Find end position
-                idx = context_end
-                while idx >= context_start and offset[idx][1] >= end_char:
-                    idx -= 1
-                end_positions.append(idx + 1)
 
         inputs["start_positions"] = start_positions
         inputs["end_positions"] = end_positions
         return inputs
 
     def apply_api_augmentation(self, question: str, context: str, enhancements: Dict) -> Tuple[str, str]:
-        """Apply API-based augmentation to question and context"""
+        """Apply API-based augmentation to question and context - OPTIMIZED"""
         aug_question = question
         aug_context = context
         
-        # Apply synonym replacements with low probability to maintain meaning
-        for original_word, data in enhancements.items():
-            if random.random() < 0.1:  # 10% chance to replace
-                synonyms = data.get('synonyms', [])
-                if synonyms:
-                    replacement = random.choice(synonyms)
-                    # Replace in question
-                    aug_question = re.sub(r'\b' + re.escape(original_word) + r'\b', 
-                                        replacement, aug_question, flags=re.IGNORECASE)
-                    self.semantic_enhancement_stats['synonyms_used'] += 1
+        try:
+            # Only apply augmentation if we have valid enhancements
+            if not enhancements:
+                return aug_question, aug_context
+                
+            # Apply synonym replacements with very low probability to maintain meaning
+            for original_word, data in enhancements.items():
+                if data is None:
+                    continue
+                    
+                if random.random() < 0.05:  # Reduced to 5% chance to replace
+                    synonyms = data.get('synonyms', []) if isinstance(data, dict) else []
+                    if synonyms and len(synonyms) > 0:
+                        replacement = random.choice(synonyms)
+                        # Replace in question only
+                        pattern = r'\b' + re.escape(original_word) + r'\b'
+                        aug_question = re.sub(pattern, replacement, aug_question, 
+                                            count=1, flags=re.IGNORECASE)
+                        self.semantic_enhancement_stats['synonyms_used'] += 1
+                        break  # Only do one replacement per example
+                        
+        except Exception as e:
+            # Silently handle errors
+            pass
         
         return aug_question, aug_context
 

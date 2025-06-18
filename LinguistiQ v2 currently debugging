@@ -27,31 +27,6 @@ from rouge_score import rouge_scorer
 from collections import Counter, defaultdict
 import time
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
-from scipy.stats import levy#!/usr/bin/env python3
-"""
-Complete Enhanced QFRL System with Free APIs and Advanced SQuAD Training
-Integrates thesaurus and dictionary APIs for enhanced text understanding and augmentation.
-"""
-
-import numpy as np
-import random
-from typing import List, Tuple, Dict, Callable, Optional, Any
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from torch.cuda.amp import autocast, GradScaler
-from torch.utils.data import DataLoader
-import requests
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
-from datasets import load_dataset, Dataset
-from transformers import AutoTokenizer, AutoModel, DataCollatorWithPadding
-from rouge_score import rouge_scorer
-from collections import Counter, defaultdict
-import time
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score
 from scipy.stats import levy
 import networkx as nx
 from enum import Enum, auto

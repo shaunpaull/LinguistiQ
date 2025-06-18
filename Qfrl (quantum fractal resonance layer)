@@ -1,0 +1,350 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import time
+import numpy as np
+from typing import Tuple
+import matplotlib.pyplot as plt
+
+# Your Quantum Fractal Resonance Layer (simplified for benchmarking)
+class QuantumFractalResonanceLayer(nn.Module):
+    def __init__(self, in_features: int, out_features: int, num_quantum_states: int = 5):
+        super(QuantumFractalResonanceLayer, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.num_quantum_states = num_quantum_states
+
+        self.input_projection = nn.Linear(in_features, out_features)
+        self.quantum_weights = nn.Parameter(torch.randn(num_quantum_states, out_features, out_features) * 0.02)
+        self.quantum_biases = nn.Parameter(torch.randn(num_quantum_states, out_features) * 0.02)
+        self.fractal_scales = nn.Parameter(torch.randn(out_features, out_features) * 0.02)
+        self.fractal_offsets = nn.Parameter(torch.randn(out_features) * 0.02)
+        self.entanglement_strength = nn.Parameter(torch.rand(out_features) * 0.02)
+        self.adaptive_base_factor = nn.Parameter(torch.rand(1) * 0.02)
+        self.adaptive_modulus_factor = nn.Parameter(torch.rand(1) * 0.2 + 1)
+        self.fractal_dimension = nn.Parameter(torch.rand(1) * 0.25 + 1.25)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Input projection
+        x = self.input_projection(x)
+        x = F.relu(x)
+        x = F.layer_norm(x, x.shape[-1:])
+
+        # Adaptive base transformation
+        x = self.adaptive_base(x, torch.clamp(self.adaptive_base_factor, 0.1, 10))
+
+        batch_size, seq_len, _ = x.shape
+        quantum_states = torch.randint(0, self.num_quantum_states, (batch_size, seq_len), device=x.device)
+
+        # Quantum weight modulation
+        weights = self.apply_adaptive_modulus(
+            self.quantum_weights[quantum_states], 
+            torch.clamp(self.adaptive_modulus_factor, 1, 10)
+        )
+        biases = self.apply_adaptive_modulus(
+            self.quantum_biases[quantum_states], 
+            torch.clamp(self.adaptive_modulus_factor, 1, 10)
+        )
+
+        # Quantum transformation
+        x = torch.matmul(x.unsqueeze(-2), weights).squeeze(-2) + biases
+        x = F.layer_norm(x, x.shape[-1:])
+
+        # Fractal modulation
+        fractal_mod = torch.sin(self.apply_adaptive_modulus(
+            torch.matmul(x, self.fractal_scales) + self.fractal_offsets.unsqueeze(0).unsqueeze(0),
+            torch.clamp(self.adaptive_modulus_factor, 1, 10)
+        ))
+        x = x * (fractal_mod + 1)
+        x = F.layer_norm(x, x.shape[-1:])
+
+        # Fractal scaling
+        x = self.fractal_scaling(x, torch.clamp(self.fractal_dimension, 1, 2))
+
+        # Entanglement
+        entanglement_effect = torch.tanh(self.entanglement_strength * x.mean(dim=1, keepdim=True))
+        x = self.entanglement_mix(x, entanglement_effect, alpha=0.5)
+
+        # Quantum fluctuation and cleanup
+        x = self.quantum_fluctuation(x, strength=0.01)
+        x = self.avoid_zero(x)
+        x = self.inverse_adaptive_base(x, torch.clamp(self.adaptive_base_factor, 0.1, 10))
+        x = F.layer_norm(x, x.shape[-1:])
+
+        return x
+
+    @staticmethod
+    def adaptive_base(x, base_factor=1.0):
+        return torch.sign(x) * torch.log1p(torch.abs(x) * base_factor)
+
+    @staticmethod
+    def inverse_adaptive_base(x, base_factor=1.0):
+        return torch.sign(x) * (torch.exp(torch.abs(x)) - 1) / base_factor
+
+    @staticmethod
+    def apply_adaptive_modulus(x, mod):
+        return x - mod * torch.floor(x / mod)
+
+    @staticmethod
+    def avoid_zero(x, epsilon=1e-6):
+        return x + epsilon
+
+    @staticmethod
+    def quantum_fluctuation(x, strength=0.01):
+        return x + strength * torch.randn_like(x)
+
+    @staticmethod
+    def fractal_scaling(x, fractal_dim):
+        return torch.sign(x) * torch.abs(x).pow(fractal_dim)
+
+    @staticmethod
+    def entanglement_mix(x, y, alpha=0.5):
+        x = torch.as_tensor(x)
+        y = torch.as_tensor(y)
+        alpha = torch.as_tensor(alpha, dtype=x.dtype, device=x.device)
+        if x.shape != y.shape:
+            x, y = torch.broadcast_tensors(x, y)
+        return alpha * x + (1 - alpha) * y + torch.sqrt(alpha * (1 - alpha)) * torch.sqrt(torch.abs(x * y) + 1e-8)
+
+
+# Standard comparison layer
+class StandardLayer(nn.Module):
+    def __init__(self, in_features: int, out_features: int):
+        super(StandardLayer, self).__init__()
+        self.linear1 = nn.Linear(in_features, out_features)
+        self.linear2 = nn.Linear(out_features, out_features)
+        self.activation = nn.ReLU()
+        self.dropout = nn.Dropout(0.1)
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.linear1(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+        x = self.linear2(x)
+        return x
+
+
+# Test models for different tasks
+class SimpleClassifier(nn.Module):
+    def __init__(self, layer_type, input_size=512, hidden_size=256, num_classes=10):
+        super(SimpleClassifier, self).__init__()
+        if layer_type == "quantum":
+            self.layer = QuantumFractalResonanceLayer(input_size, hidden_size)
+        else:
+            self.layer = StandardLayer(input_size, hidden_size)
+        self.classifier = nn.Linear(hidden_size, num_classes)
+        
+    def forward(self, x):
+        if x.dim() == 2:
+            x = x.unsqueeze(1)  # Add sequence dimension for quantum layer
+        x = self.layer(x)
+        if x.dim() == 3:
+            x = x.mean(dim=1)  # Global average pooling
+        return self.classifier(x)
+
+
+def benchmark_forward_pass(layer_type, batch_size=32, seq_len=128, input_size=512, 
+                          hidden_size=256, num_iterations=100, device='cpu'):
+    """Benchmark forward pass speed"""
+    
+    model = SimpleClassifier(layer_type, input_size, hidden_size).to(device)
+    data = torch.randn(batch_size, seq_len, input_size).to(device)
+    
+    # Warmup
+    for _ in range(10):
+        _ = model(data)
+    
+    # Benchmark
+    torch.cuda.synchronize() if device == 'cuda' else None
+    start_time = time.time()
+    
+    for _ in range(num_iterations):
+        output = model(data)
+    
+    torch.cuda.synchronize() if device == 'cuda' else None
+    end_time = time.time()
+    
+    avg_time = (end_time - start_time) / num_iterations
+    return avg_time
+
+
+def benchmark_training_step(layer_type, batch_size=32, seq_len=128, input_size=512, 
+                           hidden_size=256, num_classes=10, num_iterations=50, device='cpu'):
+    """Benchmark training step (forward + backward)"""
+    
+    model = SimpleClassifier(layer_type, input_size, hidden_size, num_classes).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss()
+    
+    data = torch.randn(batch_size, seq_len, input_size).to(device)
+    targets = torch.randint(0, num_classes, (batch_size,)).to(device)
+    
+    # Warmup
+    for _ in range(5):
+        optimizer.zero_grad()
+        output = model(data)
+        loss = criterion(output, targets)
+        loss.backward()
+        optimizer.step()
+    
+    # Benchmark
+    torch.cuda.synchronize() if device == 'cuda' else None
+    start_time = time.time()
+    
+    for _ in range(num_iterations):
+        optimizer.zero_grad()
+        output = model(data)
+        loss = criterion(output, targets)
+        loss.backward()
+        optimizer.step()
+    
+    torch.cuda.synchronize() if device == 'cuda' else None
+    end_time = time.time()
+    
+    avg_time = (end_time - start_time) / num_iterations
+    return avg_time
+
+
+def count_parameters(layer_type, input_size=512, hidden_size=256):
+    """Count parameters in each layer type"""
+    if layer_type == "quantum":
+        layer = QuantumFractalResonanceLayer(input_size, hidden_size)
+    else:
+        layer = StandardLayer(input_size, hidden_size)
+    
+    return sum(p.numel() for p in layer.parameters())
+
+
+def synthetic_accuracy_test(layer_type, num_epochs=20, batch_size=64, device='cpu'):
+    """Test on a synthetic classification task"""
+    
+    # Generate synthetic data with some pattern
+    torch.manual_seed(42)
+    input_size, hidden_size, num_classes = 256, 128, 5
+    num_samples = 1000
+    
+    # Create data with learnable patterns
+    X = torch.randn(num_samples, 32, input_size)
+    # Create targets based on some pattern in the data
+    y = (X.mean(dim=(1,2)) > 0).long() + (X.std(dim=(1,2)) > 1).long()
+    y = y % num_classes
+    
+    model = SimpleClassifier(layer_type, input_size, hidden_size, num_classes).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss()
+    
+    # Training
+    model.train()
+    accuracies = []
+    
+    for epoch in range(num_epochs):
+        total_loss = 0
+        correct = 0
+        total = 0
+        
+        for i in range(0, len(X), batch_size):
+            batch_X = X[i:i+batch_size].to(device)
+            batch_y = y[i:i+batch_size].to(device)
+            
+            optimizer.zero_grad()
+            outputs = model(batch_X)
+            loss = criterion(outputs, batch_y)
+            loss.backward()
+            optimizer.step()
+            
+            total_loss += loss.item()
+            _, predicted = outputs.max(1)
+            total += batch_y.size(0)
+            correct += predicted.eq(batch_y).sum().item()
+        
+        accuracy = 100. * correct / total
+        accuracies.append(accuracy)
+    
+    return accuracies
+
+
+def run_comprehensive_benchmark():
+    """Run all benchmarks and compare results"""
+    
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Running benchmarks on: {device}")
+    print("=" * 60)
+    
+    # Parameter count comparison
+    print("PARAMETER COUNT COMPARISON:")
+    quantum_params = count_parameters("quantum")
+    standard_params = count_parameters("standard")
+    
+    print(f"Quantum Fractal Layer: {quantum_params:,} parameters")
+    print(f"Standard Layer: {standard_params:,} parameters")
+    print(f"Parameter ratio: {quantum_params/standard_params:.2f}x more")
+    print()
+    
+    # Forward pass speed
+    print("FORWARD PASS SPEED:")
+    quantum_forward_time = benchmark_forward_pass("quantum", device=device)
+    standard_forward_time = benchmark_forward_pass("standard", device=device)
+    
+    print(f"Quantum Fractal Layer: {quantum_forward_time*1000:.2f} ms/iteration")
+    print(f"Standard Layer: {standard_forward_time*1000:.2f} ms/iteration")
+    print(f"Speed ratio: {quantum_forward_time/standard_forward_time:.2f}x slower")
+    print()
+    
+    # Training step speed
+    print("TRAINING STEP SPEED:")
+    quantum_train_time = benchmark_training_step("quantum", device=device)
+    standard_train_time = benchmark_training_step("standard", device=device)
+    
+    print(f"Quantum Fractal Layer: {quantum_train_time*1000:.2f} ms/iteration")
+    print(f"Standard Layer: {standard_train_time*1000:.2f} ms/iteration")
+    print(f"Speed ratio: {quantum_train_time/standard_train_time:.2f}x slower")
+    print()
+    
+    # Accuracy comparison
+    print("ACCURACY COMPARISON (Synthetic Task):")
+    quantum_accuracies = synthetic_accuracy_test("quantum", device=device)
+    standard_accuracies = synthetic_accuracy_test("standard", device=device)
+    
+    quantum_final_acc = quantum_accuracies[-1]
+    standard_final_acc = standard_accuracies[-1]
+    
+    print(f"Quantum Fractal Layer final accuracy: {quantum_final_acc:.2f}%")
+    print(f"Standard Layer final accuracy: {standard_final_acc:.2f}%")
+    print(f"Accuracy difference: {quantum_final_acc - standard_final_acc:+.2f}%")
+    print()
+    
+    # Summary
+    print("SUMMARY:")
+    print(f"Parameters: {quantum_params/standard_params:.1f}x more")
+    print(f"Forward speed: {quantum_forward_time/standard_forward_time:.1f}x slower")
+    print(f"Training speed: {quantum_train_time/standard_train_time:.1f}x slower")
+    print(f"Accuracy gain: {quantum_final_acc - standard_final_acc:+.1f}%")
+    
+    efficiency_ratio = (quantum_final_acc - standard_final_acc) / (quantum_train_time/standard_train_time)
+    print(f"Efficiency ratio (accuracy_gain/slowdown): {efficiency_ratio:.3f}")
+    
+    # Plot learning curves
+    plt.figure(figsize=(10, 6))
+    plt.plot(quantum_accuracies, label='Quantum Fractal Layer', linewidth=2)
+    plt.plot(standard_accuracies, label='Standard Layer', linewidth=2)
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy (%)')
+    plt.title('Learning Curves Comparison')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+    
+    return {
+        'quantum_params': quantum_params,
+        'standard_params': standard_params,
+        'quantum_forward_time': quantum_forward_time,
+        'standard_forward_time': standard_forward_time,
+        'quantum_train_time': quantum_train_time,
+        'standard_train_time': standard_train_time,
+        'quantum_final_acc': quantum_final_acc,
+        'standard_final_acc': standard_final_acc
+    }
+
+if __name__ == "__main__":
+    results = run_comprehensive_benchmark()

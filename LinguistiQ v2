@@ -917,25 +917,24 @@ class EnhancedFabulousAGI:
 
     
     def load_dataset(self, dataset_name: str, split: str = "train"):
-        """Enhanced dataset loading with OPTIMIZED API preprocessing"""
+        """Enhanced dataset loading with BETTER API preprocessing"""
         print(f"📚 Loading dataset with optimized API preprocessing...")
         try:
             self.dataset = load_dataset(dataset_name, split=split)
-            # Further reduced dataset size for faster processing
-            if len(self.dataset) > 200:  # Much smaller for demo
-                self.dataset = self.dataset.select(range(200))
+            # Use more data for better learning
+            if len(self.dataset) > 1000:  # Increased from 200
+                self.dataset = self.dataset.select(range(1000))
             
-            # Apply MINIMAL API-enhanced preprocessing
-            print("🔍 Applying light semantic enhancement (10% of examples)...")
+            # Apply more comprehensive API-enhanced preprocessing
+            print("🔍 Applying semantic enhancement to 30% of examples...")
             try:
-                # Remove disable_progress_bar argument - not supported
                 self.dataset = self.dataset.map(
                     self.api_enhanced_preprocessing, 
                     batched=False, 
-                    desc="Light API Enhancement",
+                    desc="API Enhancement",
                     num_proc=1
                 )
-                print(f"✅ API enhancement completed on subset of examples")
+                print(f"✅ API enhancement completed")
             except Exception as e:
                 print(f"⚠️  API enhancement skipped: {e}")
                 # Add empty enhancement fields to dataset
@@ -949,13 +948,19 @@ class EnhancedFabulousAGI:
             self.logger.info(f"Loaded dataset: {dataset_name}, split: {split}")
             self.logger.info(f"Number of samples: {len(self.dataset)}")
             
+            # Print vocabulary statistics
+            print(f"📊 Initial vocabulary statistics:")
+            print(f"   Total unique words expanded: {len(self.vocabulary_expansions)}")
+            total_synonyms = sum(len(syns) for syns in self.vocabulary_expansions.values())
+            print(f"   Total synonyms/variations found: {total_synonyms}")
+            
         except Exception as e:
             self.logger.error(f"Error loading dataset: {e}")
             raise
 
 
     def api_enhanced_preprocessing(self, example):
-        """Enhance individual examples using free APIs - OPTIMIZED VERSION"""
+        """Enhance individual examples using free APIs - IMPROVED VERSION"""
         try:
             # Extract key terms from question and context
             question = example.get('question', '')
@@ -966,31 +971,44 @@ class EnhancedFabulousAGI:
                 example['vocabulary_expansion_count'] = 0
                 return example
 
-            # Only process every 10th example to avoid rate limiting
+            # Process 30% of examples instead of 10%
             example_hash = hash(question + context) % 10
-            if example_hash != 0:
+            if example_hash >= 3:  # Skip 70% of examples
                 example['api_enhancements'] = {}
                 example['vocabulary_expansion_count'] = 0
                 return example
 
-            # Identify only the most important word for enhancement
+            # Identify important words for enhancement
             important_words = self.extract_important_words(question, context)
 
-            # Get API enhancements for only 1 key word to avoid rate limiting
+            # Get API enhancements for top 3 key words instead of just 1
             enhanced_data = {}
-            if important_words:
-                word = important_words[0]  # Only process the most important word
+            words_to_enhance = important_words[:3]  # Process up to 3 words
+            
+            for word in words_to_enhance:
                 try:
                     # Add a small delay to respect rate limits
-                    time.sleep(0.2)
+                    time.sleep(0.1)  # Reduced from 0.2
                     variations = self.api_manager.get_word_variations(word)
-                    if variations and (variations.get('synonyms') or variations.get('similar')):
-                        enhanced_data[word] = variations
+                    
+                    # Store all variations found
+                    if variations:
+                        has_content = False
                         if variations.get('synonyms'):
                             self.vocabulary_expansions[word].update(variations['synonyms'])
+                            has_content = True
                         if variations.get('similar'):
                             self.vocabulary_expansions[word].update(variations['similar'])
-                except Exception as e:
+                            has_content = True
+                        if variations.get('antonyms'):
+                            # Store antonyms separately for potential use
+                            self.vocabulary_expansions[f"{word}_antonyms"] = set(variations['antonyms'])
+                            has_content = True
+                        
+                        if has_content:
+                            enhanced_data[word] = variations
+                            
+                except Exception:
                     # Silently skip failed API calls
                     pass
 
@@ -1001,29 +1019,51 @@ class EnhancedFabulousAGI:
             return example
 
         except Exception as e:
-            # Return original example if enhancement fails - no logging
+            # Return original example if enhancement fails
             example['api_enhancements'] = {}
             example['vocabulary_expansion_count'] = 0
             return example
 
     def extract_important_words(self, question: str, context: str) -> List[str]:
-        """Extract important words for API enhancement"""
-        # Simple importance extraction - focus on nouns and key terms
+        """Extract important words for API enhancement - IMPROVED"""
         import re
-
-        # Combine question and context
-        text = f"{question} {context}"
-
-        # Remove common stop words and extract meaningful terms
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
-        words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())  # Words with 4+ letters
-
-        # Filter out stop words and get unique important terms
-        important = [word for word in words if word not in stop_words]
-
-        # Return top words by frequency
-        word_freq = Counter(important)
-        return [word for word, _ in word_freq.most_common(5)]
+        
+        try:
+            # Focus more on question words as they're key for QA
+            question_weight = 2  # Give question words more importance
+            
+            # Extended stop words list
+            stop_words = {
+                'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 
+                'of', 'with', 'by', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 
+                'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 
+                'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 
+                'you', 'he', 'she', 'it', 'we', 'they', 'them', 'their', 'what', 
+                'which', 'who', 'when', 'where', 'why', 'how', 'all', 'each', 'every', 
+                'some', 'any', 'few', 'more', 'most', 'other', 'into', 'through', 
+                'during', 'before', 'after', 'above', 'below', 'from', 'up', 'down', 
+                'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once'
+            }
+            
+            # Extract words from question and context
+            question_words = re.findall(r'\b[a-zA-Z]{3,}\b', question.lower())  # 3+ letters
+            context_words = re.findall(r'\b[a-zA-Z]{4,}\b', context.lower())  # 4+ letters
+            
+            # Weight question words more heavily
+            word_freq = Counter()
+            for word in question_words:
+                if word not in stop_words:
+                    word_freq[word] += question_weight
+            
+            for word in context_words:
+                if word not in stop_words:
+                    word_freq[word] += 1
+            
+            # Return top words by weighted frequency
+            return [word for word, _ in word_freq.most_common(10)]
+            
+        except Exception:
+            return []
 
     def preprocess_function(self, examples):
         """Enhanced preprocessing with QFRL and API awareness"""
@@ -1121,36 +1161,78 @@ class EnhancedFabulousAGI:
         return inputs
 
     def apply_api_augmentation(self, question: str, context: str, enhancements: Dict) -> Tuple[str, str]:
-        """Apply API-based augmentation to question and context - OPTIMIZED"""
+        """Apply API-based augmentation to question and context - IMPROVED"""
         aug_question = question
         aug_context = context
 
         try:
-            # Only apply augmentation if we have valid enhancements
             if not enhancements:
                 return aug_question, aug_context
 
-            # Apply synonym replacements with very low probability to maintain meaning
+            # Increase replacement probability for better learning
+            replacement_prob = 0.15  # Increased from 0.05 to 15%
+            
+            # Track replacements to avoid over-augmentation
+            replacements_made = 0
+            max_replacements = 2  # Allow up to 2 replacements per example
+            
             for original_word, data in enhancements.items():
-                if data is None:
+                if data is None or replacements_made >= max_replacements:
                     continue
 
-                if random.random() < 0.05:  # Reduced to 5% chance to replace
-                    synonyms = data.get('synonyms', []) if isinstance(data, dict) else []
-                    if synonyms and len(synonyms) > 0:
-                        replacement = random.choice(synonyms)
-                        # Replace in question only
-                        pattern = r'\b' + re.escape(original_word) + r'\b'
-                        aug_question = re.sub(pattern, replacement, aug_question,
-                                            count=1, flags=re.IGNORECASE)
-                        self.semantic_enhancement_stats['synonyms_used'] += 1
-                        break  # Only do one replacement per example
+                if random.random() < replacement_prob:
+                    # Get all available alternatives
+                    alternatives = []
+                    if isinstance(data, dict):
+                        alternatives.extend(data.get('synonyms', []))
+                        alternatives.extend(data.get('similar', []))
+                    
+                    if alternatives:
+                        # Choose a semantically appropriate replacement
+                        replacement = self.choose_best_replacement(original_word, alternatives, context)
+                        if replacement:
+                            # Apply replacement to both question and context
+                            pattern = r'\b' + re.escape(original_word) + r'\b'
+                            
+                            # Replace in question if present
+                            if re.search(pattern, aug_question, flags=re.IGNORECASE):
+                                aug_question = re.sub(pattern, replacement, aug_question,
+                                                    count=1, flags=re.IGNORECASE)
+                                replacements_made += 1
+                                self.semantic_enhancement_stats['synonyms_used'] += 1
+                            
+                            # Sometimes also replace in context for consistency
+                            if replacements_made < max_replacements and random.random() < 0.3:
+                                aug_context = re.sub(pattern, replacement, aug_context,
+                                                   count=1, flags=re.IGNORECASE)
+                                replacements_made += 1
 
         except Exception as e:
             # Silently handle errors
             pass
 
         return aug_question, aug_context
+
+    def choose_best_replacement(self, original: str, alternatives: List[str], context: str) -> Optional[str]:
+        """Choose the best replacement word based on context"""
+        if not alternatives:
+            return None
+        
+        # Filter alternatives by length similarity (within 50% length difference)
+        original_len = len(original)
+        filtered_alts = [
+            alt for alt in alternatives 
+            if 0.5 * original_len <= len(alt) <= 1.5 * original_len
+        ]
+        
+        if not filtered_alts:
+            filtered_alts = alternatives[:3]  # Use top 3 if no length matches
+        
+        # For now, randomly choose from filtered alternatives
+        # In a more sophisticated system, you'd use embeddings to find semantic similarity
+        return random.choice(filtered_alts)
+
+
 
     def train(self, num_epochs: int, batch_size: int):
         """Enhanced training with API integration and complete QFRL"""
@@ -1269,24 +1351,57 @@ class EnhancedFabulousAGI:
 
 
     def compute_semantic_enhancement_loss(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
-        """Compute additional loss for semantic enhancement"""
-        # Simple semantic consistency loss
-        with torch.no_grad():
-            # Get embeddings
-            embeddings = self.fluid_lattice_ai.embedding(input_ids)
-
-            # Compute semantic consistency across the batch
-            batch_mean = embeddings.mean(dim=0)
-            consistency_loss = F.mse_loss(embeddings.mean(dim=1), batch_mean.mean(dim=0).expand(embeddings.size(0), -1))
-
-        return consistency_loss
+        """Compute additional loss for semantic enhancement - IMPROVED"""
+        try:
+            with torch.no_grad():
+                # Get embeddings
+                embeddings = self.fluid_lattice_ai.embedding(input_ids)
+                
+                # Mask out padding tokens
+                if attention_mask is not None:
+                    mask = attention_mask.unsqueeze(-1).float()
+                    embeddings = embeddings * mask
+                
+                # Compute semantic consistency across the batch
+                if embeddings.size(0) > 1:
+                    # Calculate mean embedding per sequence
+                    seq_lengths = attention_mask.sum(dim=1, keepdim=True).float()
+                    seq_lengths = torch.clamp(seq_lengths, min=1.0)  # Avoid division by zero
+                    
+                    seq_means = embeddings.sum(dim=1) / seq_lengths
+                    
+                    # Compute consistency loss
+                    batch_mean = seq_means.mean(dim=0)
+                    consistency_loss = F.mse_loss(seq_means, batch_mean.unsqueeze(0).expand_as(seq_means))
+                else:
+                    # For single sample batches
+                    consistency_loss = torch.tensor(0.1, device=embeddings.device)
+                
+                # Add diversity penalty to encourage vocabulary usage
+                vocab_usage = torch.unique(input_ids).numel() / input_ids.numel()
+                diversity_bonus = 1.0 - vocab_usage  # Penalize low vocabulary diversity
+                
+                return consistency_loss * (1.0 + diversity_bonus * 0.1)
+                
+        except Exception as e:
+            # Return small constant loss on error
+            return torch.tensor(0.1, device=self.device)
 
     def check_api_augmentation_success(self) -> float:
-        """Check success rate of API augmentation"""
-        total_enhancements = sum(len(syns) for syns in self.vocabulary_expansions.values())
-        if total_enhancements > 0:
-            return min(1.0, total_enhancements / 100)  # Normalize to 0-1
-        return 0.0
+        """Check success rate of API augmentation - FIXED"""
+        try:
+            total_words_expanded = len(self.vocabulary_expansions)
+            total_variations = sum(len(syns) for syns in self.vocabulary_expansions.values())
+            
+            # Better success metric based on both coverage and richness
+            if total_words_expanded > 0:
+                # Average variations per word as success metric
+                avg_variations = total_variations / total_words_expanded
+                # Normalize to 0-1 range (assuming 10 variations per word is excellent)
+                return min(1.0, avg_variations / 10.0)
+            return 0.0
+        except Exception:
+            return 0.0
 
     def track_qfrl_metrics(self):
         """Track QFRL-specific metrics during training"""
@@ -1849,6 +1964,7 @@ def main():
         print(f"  ⚛️ Achieved {agi.metrics['quantum_coherence'][-1]:.3f} quantum coherence")
         print(f"  🎯 Final F1 Score: {agi.metrics['f1'][-1]:.3f}")
 
+      
     except Exception as e:
         print(f"💥 Critical error in Enhanced QFRL AGI System: {str(e)}")
         import traceback

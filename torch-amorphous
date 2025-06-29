@@ -1,0 +1,250 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import time
+import numpy as np
+from typing import Tuple, Optional, Union
+import matplotlib.pyplot as plt
+import warnings
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
+# --- Amorphous Operations (Upgraded and Stabilized) ---
+class AmorphousTorchOps:
+    @staticmethod
+    def amorphous_base_torch(value: torch.Tensor, base: torch.Tensor, fluidity: float = 0.1) -> torch.Tensor:
+        base = torch.clamp(base.to(value.device), min=1.1)
+        # The core amorphous operation: add noise to the base
+        base_variation = torch.randn_like(value) * fluidity * base
+        effective_base = torch.clamp(base + base_variation, min=1.1)
+        
+        value_safe = torch.sign(value) * torch.clamp(torch.abs(value), min=1e-9)
+        log_value = torch.log(torch.abs(value_safe))
+        log_base = torch.log(effective_base)
+        return torch.sign(value) * (log_value / log_base)
+
+    @staticmethod
+    def anamorphous_base_stable(amorphous_input: torch.Tensor, base: torch.Tensor, fluidity: float = 0.1, distortion_factor: float = 0.5) -> torch.Tensor:
+        """
+        Numerically stable version of anamorphous modulation.
+        Replaces the unstable torch.pow() with a safer multiplicative distortion.
+        """
+        base_multiplier = torch.clamp(base.to(amorphous_input.device), min=1.1)
+        # Apply distortion to a multiplier, not as an exponent
+        distortion = 1 + torch.randn_like(amorphous_input) * fluidity * distortion_factor
+        return amorphous_input * base_multiplier * distortion
+
+# --- Layer Implementations (Upgraded) ---
+class EnhancedQuantumFractalResonanceLayer(nn.Module):
+    """Upgraded QFRL with annealing, learnable gates, and stable amorphous ops."""
+    def __init__(self, in_features, out_features, num_quantum_states=4, amorphous_fluidity=0.1):
+        super().__init__()
+        self.amorphous_fluidity = amorphous_fluidity
+        self.input_projection = nn.Linear(in_features, out_features)
+        self.quantum_weights = nn.Parameter(torch.randn(num_quantum_states, out_features, out_features))
+        self.fractal_scales = nn.Parameter(torch.randn(out_features, out_features))
+        self.adaptive_base = nn.Parameter(torch.tensor(2.5))
+        self.adaptive_mod_base = nn.Parameter(torch.tensor(2.0))
+        self.output_projection = nn.Linear(out_features, out_features)
+        
+        # UPGRADE: Learnable gates to control the contribution of chaotic components
+        self.quantum_gate = nn.Parameter(torch.tensor(0.1))
+        self.fractal_gate = nn.Parameter(torch.tensor(0.1))
+
+    def forward(self, x: torch.Tensor, epoch_ratio: float = 1.0) -> torch.Tensor:
+        # UPGRADE: Anneal fluidity based on training progress
+        current_fluidity = self.amorphous_fluidity * epoch_ratio
+        
+        x_proj = self.input_projection(x)
+        x_proj = F.gelu(x_proj)
+        x_norm = F.layer_norm(x_proj, x_proj.shape[-1:])
+        
+        # Amorphous Base Transformation
+        x_transformed = AmorphousTorchOps.amorphous_base_torch(x_norm, self.adaptive_base, current_fluidity)
+        
+        # UPGRADE: Using index_select for deterministic quantum weight selection
+        quantum_states = torch.randint(0, self.quantum_weights.size(0), (x.size(0),), device=x.device)
+        weights = torch.index_select(self.quantum_weights, 0, quantum_states)
+        x_quantum = torch.bmm(x_transformed.unsqueeze(1), weights).squeeze(1)
+
+        # UPGRADE: Stable Anamorphous Fractal Modulation
+        fractal_input = torch.matmul(x_norm, self.fractal_scales)
+        fractal_mod = AmorphousTorchOps.anamorphous_base_stable(
+            fractal_input, self.adaptive_mod_base, current_fluidity, distortion_factor=0.5
+        )
+        x_fractal = torch.sin(fractal_mod)
+
+        # UPGRADE: Combine using learnable gates and a skip connection
+        x_combined = (self.quantum_gate * x_quantum) + (self.fractal_gate * x_fractal) + x_proj
+        
+        return self.output_projection(x_combined)
+
+class OriginalQuantumFractalResonanceLayer(nn.Module):
+    """Original QFRL for a strong baseline comparison."""
+    def __init__(self, in_features, out_features, num_quantum_states=4):
+        super().__init__()
+        self.input_projection = nn.Linear(in_features, out_features)
+        self.quantum_weights = nn.Parameter(torch.randn(num_quantum_states, out_features, out_features))
+        self.fractal_scales = nn.Parameter(torch.randn(out_features, out_features))
+        self.adaptive_base = nn.Parameter(torch.tensor(2.0))
+        self.adaptive_mod = nn.Parameter(torch.tensor(np.pi))
+        self.output_projection = nn.Linear(out_features, out_features)
+
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        x_proj = self.input_projection(x)
+        x_proj = F.gelu(x_proj)
+        x_norm = F.layer_norm(x_proj, x_proj.shape[-1:])
+        x_transformed = torch.sign(x_norm) * torch.log1p(torch.abs(x_norm) * self.adaptive_base)
+        quantum_states = torch.randint(0, self.quantum_weights.size(0), (x.size(0),), device=x.device)
+        weights = torch.index_select(self.quantum_weights, 0, quantum_states)
+        x_quantum = torch.bmm(x_transformed.unsqueeze(1), weights).squeeze(1)
+        x_fractal = torch.sin(torch.matmul(x_norm, self.fractal_scales) / self.adaptive_mod)
+        x_combined = x_quantum + x_fractal + x_proj
+        return self.output_projection(x_combined)
+
+class StandardLayer(nn.Module):
+    def __init__(self, in_features, out_features):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(in_features, out_features), nn.GELU(), nn.Linear(out_features, out_features))
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor: return self.net(x)
+
+# --- Model and Data Setup ---
+class Classifier(nn.Module):
+    def __init__(self, layer_type, input_size=2, hidden_size=128, num_classes=2):
+        super().__init__()
+        self.layer_type = layer_type
+        if layer_type == "enhanced_quantum": self.layer = EnhancedQuantumFractalResonanceLayer(input_size, hidden_size)
+        elif layer_type == "original_quantum": self.layer = OriginalQuantumFractalResonanceLayer(input_size, hidden_size)
+        else: self.layer = StandardLayer(input_size, hidden_size)
+        self.classifier = nn.Linear(hidden_size, num_classes)
+        
+    def forward(self, x, epoch_ratio: float = 1.0):
+        if self.layer_type != "standard":
+            x = self.layer(x, epoch_ratio=epoch_ratio)
+        else:
+            x = self.layer(x)
+        return self.classifier(x)
+
+def create_spirals_dataset(n_samples, noise=0.25):
+    n = n_samples // 2
+    t = np.sqrt(np.random.rand(n, 1)) * 900 * (2*np.pi)/360
+    dx = -np.cos(t)*t + np.random.rand(n, 1) * noise
+    dy = np.sin(t)*t + np.random.rand(n, 1) * noise
+    return (torch.FloatTensor(np.vstack((np.hstack((dx, dy)), np.hstack((-dx, -dy))))),
+            torch.LongTensor(np.hstack((np.zeros(n), np.ones(n)))))
+
+# --- Analysis Functions ---
+def run_training_and_evaluation(model, train_loader, val_loader, epochs, device):
+    model.to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    criterion = nn.CrossEntropyLoss()
+    history = {'val_acc': [], 'adaptive_base': [], 'adaptive_mod': [], 'quantum_gate': [], 'fractal_gate': []}
+
+    print(f"Training {model.layer_type} model...")
+    for epoch in range(epochs):
+        model.train()
+        for data, targets in train_loader:
+            optimizer.zero_grad()
+            output = model(data.to(device), epoch_ratio=(epoch + 1) / epochs)
+            loss = criterion(output, targets.to(device))
+            loss.backward()
+            optimizer.step()
+        
+        model.eval()
+        correct, total = 0, 0
+        with torch.no_grad():
+            for data, targets in val_loader:
+                output = model(data.to(device), epoch_ratio=1.0)
+                correct += (output.argmax(1) == targets.to(device)).sum().item()
+                total += targets.size(0)
+        
+        val_acc = correct / total
+        history['val_acc'].append(val_acc)
+        if hasattr(model.layer, 'adaptive_base'):
+            history['adaptive_base'].append(model.layer.adaptive_base.item())
+        if hasattr(model.layer, 'adaptive_mod_base'):
+            history['adaptive_mod'].append(model.layer.adaptive_mod_base.item())
+        if hasattr(model.layer, 'quantum_gate'):
+            history['quantum_gate'].append(model.layer.quantum_gate.item())
+            history['fractal_gate'].append(model.layer.fractal_gate.item())
+
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for data, targets in val_loader:
+            output = model(data.to(device))
+            all_preds.extend(output.argmax(1).cpu().numpy())
+            all_labels.extend(targets.cpu().numpy())
+    return history, (all_labels, all_preds)
+
+def test_stochastic_stability(model, data_loader, device, n_passes=20):
+    model.eval()
+    data, _ = next(iter(data_loader))
+    data = data.to(device)
+    with torch.no_grad():
+        outputs = torch.stack([model(data, epoch_ratio=1.0) for _ in range(n_passes)], dim=0)
+    std_dev_probs = F.softmax(outputs, dim=-1).std(dim=0).mean().item()
+    print(f"\n--- Stochastic Stability (Enhanced Quantum) ---\nMean Std Dev of Output Probs: {std_dev_probs:.6f}")
+
+def plot_dashboard(histories, cms, models, X_val, y_val):
+    fig = plt.figure(figsize=(18, 18))
+    gs = fig.add_gridspec(3, 3)
+    fig.suptitle("Upgraded Model Analysis Dashboard", fontsize=20, weight='bold')
+
+    # Accuracy, Parameter, and Gate Plots
+    ax_acc = fig.add_subplot(gs[0, 0]); ax_params = fig.add_subplot(gs[0, 1]); ax_gates = fig.add_subplot(gs[0, 2])
+    for l, h in histories.items():
+        ax_acc.plot(h['val_acc'], label=f'{l}')
+        if 'adaptive_base' in h and h['adaptive_base']: ax_params.plot(h['adaptive_base'], label=f'{l} Base')
+        if 'adaptive_mod' in h and h['adaptive_mod']: ax_params.plot(h['adaptive_mod'], label=f'{l} Mod', linestyle='--')
+        if 'quantum_gate' in h and h['quantum_gate']: ax_gates.plot(h['quantum_gate'], label=f'Quantum Gate')
+        if 'fractal_gate' in h and h['fractal_gate']: ax_gates.plot(h['fractal_gate'], label=f'Fractal Gate', linestyle=':')
+    
+    ax_acc.set_title("Validation Accuracy"); ax_acc.legend(); ax_acc.grid(True, alpha=0.5)
+    ax_params.set_title("Learnable Parameter Evolution"); ax_params.legend(); ax_params.grid(True, alpha=0.5)
+    ax_gates.set_title("Enhanced Model Gate Weights"); ax_gates.legend(); ax_gates.grid(True, alpha=0.5)
+
+    # Confusion Matrices and Decision Boundaries
+    for i, (l_type, model) in enumerate(models.items()):
+        ax_cm = fig.add_subplot(gs[1, i]); ax_db = fig.add_subplot(gs[2, i])
+        disp = ConfusionMatrixDisplay(confusion_matrix=cms[l_type], display_labels=[0, 1])
+        disp.plot(ax=ax_cm, cmap='viridis'); ax_cm.set_title(f"CM: {l_type}")
+        plot_decision_boundary(model, X_val.numpy(), y_val.numpy(), ax_db, f"Boundary: {l_type}")
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig('upgraded_analysis_plot.png')
+    print("\nUpgraded analysis dashboard saved as 'upgraded_analysis_plot.png'")
+
+def plot_decision_boundary(model, X, y, ax, title):
+    model.to('cpu').eval()
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.1), np.arange(y_min, y_max, 0.1))
+    with torch.no_grad():
+        Z = model(torch.from_numpy(np.c_[xx.ravel(), yy.ravel()]).float()).argmax(axis=1).reshape(xx.shape)
+    ax.contourf(xx, yy, Z, alpha=0.5, cmap=plt.cm.RdYlBu)
+    ax.scatter(X[:, 0], X[:, 1], c=y, s=20, edgecolor='k', cmap=plt.cm.RdYlBu)
+    ax.set_title(title, weight='bold'); ax.set_xticks(()); ax.set_yticks(())
+
+# --- Main Execution ---
+def main():
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Running upgraded tests on device: {device}\n")
+    
+    X, y = create_spirals_dataset(2000)
+    train_ds, val_ds = torch.utils.data.random_split(TensorDataset(X, y), [0.8, 0.2])
+    train_loader = DataLoader(train_ds, batch_size=128, shuffle=True)
+    val_loader = DataLoader(val_ds, batch_size=128)
+
+    histories, cms, models = {}, {}, {}
+    for l_type in ["enhanced_quantum", "original_quantum", "standard"]:
+        model = Classifier(l_type)
+        history, cm_data = run_training_and_evaluation(model, val_loader, val_loader, epochs=100, device=device)
+        histories[l_type], cms[l_type], models[l_type] = history, confusion_matrix(cm_data[0], cm_data[1]), model
+
+    test_stochastic_stability(models["enhanced_quantum"], val_loader, device)
+    
+    X_val, y_val = val_ds.dataset.tensors[0][val_ds.indices], val_ds.dataset.tensors[1][val_ds.indices]
+    plot_dashboard(histories, cms, models, X_val, y_val)
+
+if __name__ == '__main__':
+    main()
